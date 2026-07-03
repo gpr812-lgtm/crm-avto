@@ -34,8 +34,10 @@ function calcPlanCPL(budget: number, rl: number): number {
 function calcTotalLeads(days: Record<number, number>): number {
   return Object.values(days).reduce((s, v) => s + v, 0)
 }
-function calcFactCPL(budget: number, totalLeads: number): number {
-  return totalLeads > 0 ? budget / totalLeads : 0
+// CPL факт = ΣЛ (фактический трафик) × план CPL
+// (по логике пользователя: кол-во трафика по источнику × план CPL = факт CPL)
+function calcFactCPL(totalLeads: number, planCpl: number): number {
+  return totalLeads * planCpl
 }
 function calcFactSR(contractsFact: number, totalLeads: number): number {
   return contractsFact > 0 && totalLeads > 0 ? (contractsFact / totalLeads) * 100 : 0
@@ -165,7 +167,7 @@ export function PlanFactTab() {
       factIssuedSum += cf?.issued ?? 0
     }
     const planCpl = totalRl > 0 ? budget / totalRl : 0
-    const factCpl = calcFactCPL(budget, totalLeads)
+    const factCpl = calcFactCPL(totalLeads, planCpl)
     const factSR = calcFactSR(factContractsSum, totalLeads)
     return {
       budget, totalLeads, totalRl,
@@ -186,7 +188,7 @@ export function PlanFactTab() {
       const p = getPlan(ch.name)
       const tl = calcTotalLeads(p.days)
       const planCpl = calcPlanCPL(p.budget, p.rl)
-      const factCpl = calcFactCPL(p.budget, tl)
+      const factCpl = calcFactCPL(tl, planCpl)
       const factSr = calcFactSR(0, tl) // per-channel fact not tracked
       rows.push([
         ch.name, ch.group,
@@ -296,11 +298,15 @@ export function PlanFactTab() {
                   const chs = groupedChannels[group] ?? []
                   if (chs.length === 0) return null
                   let gBudget = 0, gLeads = 0, gRl = 0, gFactC = 0, gFactI = 0
+                  let gFactCplSum = 0
                   for (const ch of chs) {
                     const p = getPlan(ch.name)
                     gBudget += p.budget
                     gLeads += calcTotalLeads(p.days)
                     gRl += p.rl
+                    // Факт CPL = ΣЛ × план CPL (сумма по каналам группы)
+                    const chPlanCpl = calcPlanCPL(p.budget, p.rl)
+                    gFactCplSum += calcFactCPL(calcTotalLeads(p.days), chPlanCpl)
                     const cf = data?.channelFacts?.[ch.name]
                     gFactC += cf?.contracts ?? 0
                     gFactI += cf?.issued ?? 0
@@ -321,6 +327,7 @@ export function PlanFactTab() {
                       groupBudget={gBudget}
                       groupLeads={gLeads}
                       groupRl={gRl}
+                      groupFactCpl={gFactCplSum}
                       groupFactContracts={gFactC}
                       groupFactIssued={gFactI}
                     />
@@ -343,7 +350,7 @@ export function PlanFactTab() {
                     return <td key={day} className="border border-[hsl(220,16%,90%)] px-0.5 py-1 text-center tabular-nums">{sum || ''}</td>
                   })}
                   <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(289,60%,90%)] tabular-nums">{formatNumber(grandTotals.budget)}</td>
-                  <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(289,60%,90%)] tabular-nums" title={`= Бюджет / ΣЛ = ${grandTotals.budget} / ${grandTotals.totalLeads}`}>
+                  <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(289,60%,90%)] tabular-nums" title="= Σ (ΣЛ × план CPL) по всем каналам">
                     {grandTotals.factCpl > 0 ? formatNumber(Math.round(grandTotals.factCpl)) : '—'}
                   </td>
                   <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(289,60%,90%)] tabular-nums" title="РЛ факт = Σ дней по всем каналам">{grandTotals.totalLeads}</td>
@@ -362,7 +369,7 @@ export function PlanFactTab() {
           <span className="font-semibold text-[hsl(215,28%,22%)]">📐 Формулы (по Excel):</span>
           <span><code className="bg-white px-1 rounded">CPL (план) = Бюджет / РЛ</code></span>
           <span><code className="bg-white px-1 rounded">ΣЛ = SUM(дней)</code></span>
-          <span><code className="bg-white px-1 rounded">CPL (факт) = Бюджет / ΣЛ</code></span>
+          <span><code className="bg-white px-1 rounded">CPL (факт) = ΣЛ × план CPL</code></span>
           <span><code className="bg-white px-1 rounded">SR% (факт) = К.факт / ΣЛ × 100</code></span>
           <span className="text-[hsl(142,60%,35%)]"><code className="bg-white px-1 rounded">К.факт, В.факт — вводятся вручную</code></span>
         </div>
@@ -403,13 +410,14 @@ interface FragmentGroupProps {
   groupBudget: number
   groupLeads: number
   groupRl: number
+  groupFactCpl: number
   groupFactContracts: number
   groupFactIssued: number
 }
 
 function FragmentGroup({
   group, channels, dim, year, month, getPlan, getChannelFact, onUpdateDay, onUpdateParam, onUpdateChannelFact,
-  groupBudget, groupLeads, groupRl, groupFactContracts, groupFactIssued,
+  groupBudget, groupLeads, groupRl, groupFactCpl, groupFactContracts, groupFactIssued,
 }: FragmentGroupProps) {
   const totalCols = 1 + 4 + dim + 6
   return (
@@ -424,7 +432,7 @@ function FragmentGroup({
         const cf = getChannelFact(ch.name)
         const totalLeads = calcTotalLeads(p.days)
         const planCpl = calcPlanCPL(p.budget, p.rl)
-        const factCpl = calcFactCPL(p.budget, totalLeads)
+        const factCpl = calcFactCPL(totalLeads, planCpl)
         const factSr = calcFactSR(cf.contracts, totalLeads)
         return (
           <tr key={ch.id} className="hover:bg-[hsl(220,23%,97%)]">
@@ -445,7 +453,7 @@ function FragmentGroup({
             })}
             {/* ФАКТ */}
             <td className="border border-[hsl(220,16%,90%)] px-1 py-0.5 text-center bg-[hsl(289,60%,95%)] tabular-nums" title="Бюджет = план">{formatNumber(p.budget)}</td>
-            <td className="border border-[hsl(220,16%,90%)] px-1 py-0.5 text-center bg-[hsl(289,60%,95%)] tabular-nums" title={`= ${p.budget} / ${totalLeads}`}>
+            <td className="border border-[hsl(220,16%,90%)] px-1 py-0.5 text-center bg-[hsl(289,60%,95%)] tabular-nums" title={`= ΣЛ × план CPL = ${totalLeads} × ${planCpl.toFixed(0)}`}>
               {factCpl > 0 ? formatNumber(Math.round(factCpl)) : '—'}
             </td>
             <td className="border border-[hsl(220,16%,90%)] px-1 py-0.5 text-center bg-[hsl(289,60%,95%)] tabular-nums font-semibold" title="= Σ дней">{totalLeads || ''}</td>
@@ -468,8 +476,8 @@ function FragmentGroup({
         <td className="border border-[hsl(220,16%,90%)] px-1 py-1"></td>
         {Array.from({ length: dim }, (_, i) => <td key={i} className="border border-[hsl(220,16%,90%)] px-0.5 py-1"></td>)}
         <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(289,60%,90%)] tabular-nums">{formatNumber(groupBudget)}</td>
-        <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(289,60%,90%)] tabular-nums">
-          {groupLeads > 0 ? formatNumber(Math.round(groupBudget / groupLeads)) : ''}
+        <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(289,60%,90%)] tabular-nums" title="= Σ (ΣЛ × план CPL) по каналам группы">
+          {groupFactCpl > 0 ? formatNumber(Math.round(groupFactCpl)) : ''}
         </td>
         <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(289,60%,90%)] tabular-nums">{groupLeads}</td>
         <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(38,90%,90%)] tabular-nums">

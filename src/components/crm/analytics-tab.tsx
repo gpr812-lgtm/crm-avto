@@ -101,6 +101,26 @@ export function AnalyticsTab() {
     return { count, jok, j, o, k, ti, kr }
   }, [groups])
 
+  // 5 KPI metrics based on РИСК + статус:
+  // - Выдано: РИСК=1 (выданные автомобили)
+  // - Оплачено: РИСК=2 (оплаченные)
+  // - Предоплата: РИСК=3 (предоплата)
+  // - Перекат: РИСК=4 + статус Призрак или Склад (поставка/перекат)
+  // - Отказ: РИСК=4 + статус Отказ
+  const kpiMetrics = useMemo(() => {
+    let vydano = 0, oplacheno = 0, predoplata = 0, perekat = 0, otkaz = 0
+    for (const d of filteredDeals) {
+      if (d.risk === '1') vydano++
+      else if (d.risk === '2') oplacheno++
+      else if (d.risk === '3') predoplata++
+      else if (d.risk === '4') {
+        if (d.status === 'Отказ') otkaz++
+        else if (d.status === 'Призрак' || d.status === 'Склад') perekat++
+      }
+    }
+    return { vydano, oplacheno, predoplata, perekat, otkaz }
+  }, [filteredDeals])
+
   const setFilter = (key: keyof FilterState, value: string) => {
     setFilters((f) => ({ ...f, [key]: value }))
   }
@@ -164,12 +184,13 @@ export function AnalyticsTab() {
         )}
       </Card>
 
-      {/* KPI cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        <KpiCard label="Всего АМ" value={formatNumber(totals.count)} color="hsl(221,60%,38%)" />
-        <KpiCard label="Общий ЖОК" value={`${formatNumber(totals.jok)} ₽`} color="hsl(142,60%,35%)" />
-        <KpiCard label="ТИ" value={formatNumber(totals.ti)} color="hsl(217,91%,55%)" />
-        <KpiCard label="КР" value={formatNumber(totals.kr)} color="hsl(38,90%,45%)" />
+      {/* KPI cards — 5 metrics based on РИСК + статус */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+        <KpiCard label="🚗 Выдано" value={formatNumber(kpiMetrics.vydano)} color="hsl(142,60%,35%)" sub="РИСК=1" />
+        <KpiCard label="💰 Оплачено" value={formatNumber(kpiMetrics.oplacheno)} color="hsl(217,91%,45%)" sub="РИСК=2" />
+        <KpiCard label="💳 Предоплата" value={formatNumber(kpiMetrics.predoplata)} color="hsl(38,90%,40%)" sub="РИСК=3" />
+        <KpiCard label="🔄 Перекат" value={formatNumber(kpiMetrics.perekat)} color="hsl(280,40%,45%)" sub="РИСК=4 + Призрак/Склад" />
+        <KpiCard label="❌ Отказ" value={formatNumber(kpiMetrics.otkaz)} color="hsl(0,72%,50%)" sub="РИСК=4 + Отказ" />
       </div>
 
       {/* Analytics table */}
@@ -256,11 +277,12 @@ export function AnalyticsTab() {
   )
 }
 
-function KpiCard({ label, value, color }: { label: string; value: string; color: string }) {
+function KpiCard({ label, value, color, sub }: { label: string; value: string; color: string; sub?: string }) {
   return (
     <Card className="p-4 flex flex-col gap-1.5 crm-card-shadow border-[hsl(220,16%,90%)]">
       <div className="text-[10px] text-[hsl(215,16%,47%)] uppercase tracking-wide font-medium">{label}</div>
-      <div className="text-xl font-bold tabular-nums" style={{ color }}>{value}</div>
+      <div className="text-2xl font-bold tabular-nums" style={{ color }}>{value}</div>
+      {sub && <div className="text-[9px] text-[hsl(215,16%,60%)]">{sub}</div>}
     </Card>
   )
 }

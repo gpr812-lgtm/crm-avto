@@ -396,9 +396,9 @@ export function TrafficTab() {
 
 function ForecastCard({ label, value, sub, highlight, color = 'white' }: { label: string; value: string | number; sub?: string; highlight?: boolean; color?: string }) {
   return (
-    <div className={`rounded p-2 ${highlight ? 'bg-white/25' : 'bg-white/10'}`}>
+    <div className={`rounded p-2 text-center ${highlight ? 'bg-white/25' : 'bg-white/10'}`}>
       <div className="text-[10px] opacity-90">{label}</div>
-      <div className="text-xl font-bold" style={{ color }}>{value}</div>
+      <div className="text-xl font-bold tabular-nums" style={{ color }}>{value}</div>
       {sub && <div className="text-[10px] opacity-75">{sub}</div>}
     </div>
   )
@@ -692,7 +692,7 @@ function WeeklySummary({
           Σ: <b className="tabular-nums">{grandTotal}</b> → <b className="tabular-nums">{grandContracts}</b> 📄 ({grandPct.toFixed(0)}%)
         </span>
       </div>
-      <div className="flex gap-1.5 p-2 overflow-x-auto crm-scroll">
+      <div className="grid p-2 gap-2" style={{ gridTemplateColumns: `repeat(${weeks.length}, minmax(0, 1fr))` }}>
         {weeks.map((w, idx) => {
           const days = w.days.filter((d) => d > 0)
           const first = days[0] ?? 0
@@ -705,36 +705,38 @@ function WeeklySummary({
           return (
             <div
               key={idx}
-              className={`flex-shrink-0 rounded-lg border px-2.5 py-1.5 text-center min-w-20 transition-all ${
+              className={`rounded-lg border px-3 py-2 text-center transition-all ${
                 hasData
-                  ? 'bg-[hsl(220,20%,98%)] border-[hsl(220,16%,90%)] hover:border-[hsl(221,60%,50%)] hover:shadow-sm'
-                  : 'bg-[hsl(220,20%,98%)] border-[hsl(220,16%,92%)] opacity-50'
+                  ? 'bg-[hsl(220,20%,98%)] border-[hsl(220,16%,88%)] hover:border-[hsl(221,60%,50%)] hover:shadow-sm'
+                  : 'bg-[hsl(220,20%,99%)] border-[hsl(220,16%,93%)] opacity-60'
               }`}
             >
-              <div className="text-[9px] text-[hsl(215,16%,47%)] uppercase font-medium">
-                Нед {idx + 1}
+              <div className="text-[10px] text-[hsl(215,16%,47%)] uppercase font-semibold tracking-wide">
+                Неделя {idx + 1}
               </div>
-              <div className="text-[9px] text-[hsl(215,16%,60%)] mb-1">
-                {first && last ? (first === last ? first : `${first}–${last}`) : '—'}
+              <div className="text-[10px] text-[hsl(215,16%,55%)] mb-1.5">
+                {first && last ? (first === last ? `${first} число` : `${first}–${last}`) : '—'}
               </div>
-              <div className="text-base font-bold tabular-nums leading-none" style={{ color: hasData ? 'hsl(221,60%,38%)' : 'hsl(215,16%,70%)' }}>
-                {total || '—'}
+              <div className="text-2xl font-bold tabular-nums leading-none mb-1" style={{ color: hasData ? 'hsl(221,60%,38%)' : 'hsl(215,16%,75%)' }}>
+                {total || '0'}
               </div>
-              {hasData && (
-                <>
-                  <div className="text-[10px] text-[hsl(142,60%,35%)] tabular-nums mt-0.5">
+              {hasData ? (
+                <div className="flex items-center justify-center gap-1.5 text-[11px]">
+                  <span className="text-[hsl(142,60%,35%)] tabular-nums font-medium">
                     {contracts} 📄
-                  </div>
-                  <div
-                    className="text-[9px] tabular-nums font-medium mt-0.5 rounded px-1"
+                  </span>
+                  <span
+                    className="tabular-nums font-semibold px-1.5 py-0.5 rounded"
                     style={{
                       color: pct >= 50 ? 'hsl(142,60%,25%)' : pct >= 25 ? 'hsl(38,80%,30%)' : 'hsl(0,70%,40%)',
-                      backgroundColor: pct >= 50 ? 'hsl(142,60%,92%)' : pct >= 25 ? 'hsl(38,80%,92%)' : 'hsl(0,70%,94%)',
+                      backgroundColor: pct >= 50 ? 'hsl(142,60%,90%)' : pct >= 25 ? 'hsl(38,80%,90%)' : 'hsl(0,70%,92%)',
                     }}
                   >
                     {pct.toFixed(0)}%
-                  </div>
-                </>
+                  </span>
+                </div>
+              ) : (
+                <div className="text-[10px] text-[hsl(215,16%,60%)]">нет данных</div>
               )}
             </div>
           )
