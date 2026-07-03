@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useCrmStore } from '@/lib/store'
 import { api, type PlanFactResponse } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -65,9 +65,27 @@ export function PlanFactTab() {
       setFactContracts(res.fact.contracts)
       setFactIssued(res.fact.issued)
       setLoading(false)
+      dataLoadedRef.current = true
     })
     return () => { cancelled = true }
   }, [mk, loadChannels])
+
+  // Reload plan-fact data when channels change (e.g., after editing in Settings dialog)
+  // Hash channels by id+budget+rl+sr+group+name to detect real changes
+  const channelsHash = useMemo(() => {
+    return channels.map((c) => `${c.id}:${c.name}:${c.group}:${c.budget}:${c.rl}:${c.sr}`).join('|')
+  }, [channels])
+
+  const dataLoadedRef = useRef(false)
+  useEffect(() => {
+    if (!dataLoadedRef.current) return
+    let cancelled = false
+    api.getPlanFact(mk).then((res) => {
+      if (cancelled) return
+      setData(res)
+    })
+    return () => { cancelled = true }
+  }, [channelsHash, mk])
 
   const groupedChannels = useMemo(() => {
     const out: Record<string, Channel[]> = {}
@@ -207,20 +225,20 @@ export function PlanFactTab() {
             📋 План/Факт — {['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][month - 1]} {year}
           </div>
           <div className="overflow-x-auto crm-scroll">
-            <table className="text-[10px] border-collapse crm-table" style={{ tableLayout: 'fixed' }}>
+            <table className="text-[10px] border-collapse crm-table w-full" style={{ tableLayout: 'fixed' }}>
               <colgroup>
-                <col style={{ width: '110px' }} />
+                <col style={{ width: '140px' }} />
+                <col style={{ width: '70px' }} />
                 <col style={{ width: '55px' }} />
+                <col style={{ width: '40px' }} />
                 <col style={{ width: '45px' }} />
-                <col style={{ width: '30px' }} />
-                <col style={{ width: '35px' }} />
-                {Array.from({ length: dim }, (_, i) => <col key={i} style={{ width: '22px' }} />)}
+                {Array.from({ length: dim }, (_, i) => <col key={i} />)}
+                <col style={{ width: '50px' }} />
+                <col style={{ width: '50px' }} />
                 <col style={{ width: '40px' }} />
-                <col style={{ width: '40px' }} />
-                <col style={{ width: '30px' }} />
-                <col style={{ width: '35px' }} />
-                <col style={{ width: '38px' }} />
-                <col style={{ width: '38px' }} />
+                <col style={{ width: '45px' }} />
+                <col style={{ width: '50px' }} />
+                <col style={{ width: '50px' }} />
               </colgroup>
               <thead>
                 <tr className="bg-[hsl(220,20%,96%)]">
@@ -495,14 +513,13 @@ function DayCell({ value, onCommit }: { value: number; onCommit: (v: number) => 
 }
 
 // ============================
-// Channels Settings Dialog
+// Channels Settings Dialog — full CRUD with inline editing
 // ============================
 function ChannelsSettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const { channels, addChannel, editChannel, removeChannel } = useCrmStore()
   const [newName, setNewName] = useState('')
   const [newGroup, setNewGroup] = useState('Digital')
   const [newBudget, setNewBudget] = useState(0)
-  const [newCpl, setNewCpl] = useState(0)
   const [newRl, setNewRl] = useState(0)
   const [newSr, setNewSr] = useState(0)
 
@@ -520,44 +537,41 @@ function ChannelsSettingsDialog({ open, onOpenChange }: { open: boolean; onOpenC
       toast.warning('Введите название канала')
       return
     }
-    await addChannel({ name: newName.trim(), group: newGroup, budget: newBudget, cpl: newCpl, rl: newRl, sr: newSr })
-    toast.success('Канал добавлен')
+    await addChannel({ name: newName.trim(), group: newGroup, budget: newBudget, cpl: 0, rl: newRl, sr: newSr })
+    toast.success(`Канал "${newName.trim()}" добавлен`)
     setNewName('')
-    setNewBudget(0); setNewCpl(0); setNewRl(0); setNewSr(0)
-  }
-
-  const handleEdit = async (ch: Channel) => {
-    const newName = prompt('Новое название канала:', ch.name)
-    if (newName && newName !== ch.name) {
-      await editChannel(ch.id, { name: newName })
-      toast.success('Канал переименован')
-    }
+    setNewBudget(0); setNewRl(0); setNewSr(0)
   }
 
   const handleDelete = async (ch: Channel) => {
-    if (!confirm(`Удалить канал "${ch.name}"?\nВсе плановые данные по этому каналу также будут удалены.`)) return
+    if (!confirm(`Удалить канал "${ch.name}"?\n\nВсе плановые данные по этому каналу также будут удалены безвозвратно.`)) return
     await removeChannel(ch.id)
-    toast.success('Канал удалён')
+    toast.success(`Канал "${ch.name}" удалён`)
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle>⚙️ Управление каналами</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Settings className="w-4 h-4" />
+            Управление каналами трафика
+          </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-3 py-2">
+        <div className="flex-1 overflow-y-auto crm-scroll pr-1 -mr-1 space-y-3">
           {/* Add new channel form */}
-          <div className="border border-[hsl(220,16%,90%)] rounded p-3 bg-[hsl(220,20%,98%)]">
-            <div className="text-xs font-semibold mb-2">➕ Добавить канал</div>
-            <div className="grid grid-cols-2 gap-2 mb-2">
-              <div>
-                <Label className="text-[10px]">Название</Label>
+          <div className="border border-[hsl(221,60%,80%)] rounded-lg p-3 bg-[hsl(217,91%,97%)]">
+            <div className="text-xs font-semibold mb-2 flex items-center gap-1 text-[hsl(221,60%,30%)]">
+              <Plus className="w-3.5 h-3.5" /> Добавить новый канал
+            </div>
+            <div className="grid grid-cols-12 gap-2">
+              <div className="col-span-4">
+                <Label className="text-[10px] uppercase text-[hsl(215,16%,47%)]">Название</Label>
                 <Input value={newName} onChange={(e) => setNewName(e.target.value)} className="h-8 text-xs" placeholder="Например: Авито" />
               </div>
-              <div>
-                <Label className="text-[10px]">Группа</Label>
+              <div className="col-span-3">
+                <Label className="text-[10px] uppercase text-[hsl(215,16%,47%)]">Группа</Label>
                 <Select value={newGroup} onValueChange={setNewGroup}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -565,43 +579,45 @@ function ChannelsSettingsDialog({ open, onOpenChange }: { open: boolean; onOpenC
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label className="text-[10px]">Бюджет (₽)</Label>
+              <div className="col-span-2">
+                <Label className="text-[10px] uppercase text-[hsl(215,16%,47%)]">Бюджет ₽</Label>
                 <Input type="number" value={newBudget} onChange={(e) => setNewBudget(Number(e.target.value) || 0)} className="h-8 text-xs" />
               </div>
-              <div>
-                <Label className="text-[10px]">РЛ</Label>
+              <div className="col-span-1">
+                <Label className="text-[10px] uppercase text-[hsl(215,16%,47%)]">РЛ</Label>
                 <Input type="number" value={newRl} onChange={(e) => setNewRl(Number(e.target.value) || 0)} className="h-8 text-xs" />
               </div>
-              <div>
-                <Label className="text-[10px]">SR%</Label>
+              <div className="col-span-1">
+                <Label className="text-[10px] uppercase text-[hsl(215,16%,47%)]">SR%</Label>
                 <Input type="number" value={newSr} onChange={(e) => setNewSr(Number(e.target.value) || 0)} className="h-8 text-xs" />
               </div>
+              <div className="col-span-1 flex items-end">
+                <Button size="sm" onClick={handleAdd} className="w-full h-8" title="Добавить канал">
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
-            <Button size="sm" onClick={handleAdd} className="w-full h-8">
-              <Plus className="w-3.5 h-3.5 mr-1" /> Добавить
-            </Button>
+            <div className="text-[10px] text-[hsl(215,16%,60%)] mt-2">
+              💡 CPL вычисляется автоматически = Бюджет / РЛ. Можно изменить позже в таблице.
+            </div>
           </div>
 
-          {/* List of channels by group */}
+          {/* List of channels by group with inline editing */}
+          <div className="text-xs font-semibold text-[hsl(215,28%,22%)] mb-1">
+            Существующие каналы ({channels.length})
+          </div>
           {GROUPS.map((g) => {
             const chs = grouped[g] ?? []
             if (chs.length === 0) return null
             return (
-              <div key={g}>
-                <div className="text-xs font-semibold bg-[hsl(224,56%,25%)] text-white px-2 py-1 rounded-t">{g}</div>
-                <div className="border border-t-0 border-[hsl(220,16%,90%)] rounded-b divide-y">
+              <div key={g} className="border border-[hsl(220,16%,90%)] rounded-lg overflow-hidden">
+                <div className="text-xs font-semibold bg-[hsl(224,56%,25%)] text-white px-3 py-1.5 flex items-center justify-between">
+                  <span>{g}</span>
+                  <span className="text-[10px] opacity-70">{chs.length} канал(ов)</span>
+                </div>
+                <div className="divide-y">
                   {chs.map((ch) => (
-                    <div key={ch.id} className="flex items-center gap-2 px-2 py-1 text-xs hover:bg-[hsl(220,23%,98%)]">
-                      <span className="flex-1 truncate">{ch.name}</span>
-                      <span className="text-[hsl(215,16%,47%)]">Б: {formatNumber(ch.budget)}</span>
-                      <span className="text-[hsl(215,16%,47%)]">РЛ: {ch.rl}</span>
-                      <span className="text-[hsl(215,16%,47%)]">SR: {ch.sr}%</span>
-                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => handleEdit(ch)}>✏️</Button>
-                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-[hsl(0,72%,51%)]" onClick={() => handleDelete(ch)}>
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
+                    <ChannelRow key={ch.id} channel={ch} onEdit={editChannel} onDelete={handleDelete} />
                   ))}
                 </div>
               </div>
@@ -609,10 +625,191 @@ function ChannelsSettingsDialog({ open, onOpenChange }: { open: boolean; onOpenC
           })}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="border-t pt-3">
+          <div className="text-[10px] text-[hsl(215,16%,47%)] flex-1">
+            💡 Все изменения (бюджет, РЛ, SR%) сохраняются автоматически и сразу применяются в таблице План/Факт
+          </div>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Закрыть</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+// ============================
+// ChannelRow — single channel with inline-editable fields
+// ============================
+function ChannelRow({ channel, onEdit, onDelete }: {
+  channel: Channel
+  onEdit: (id: number, updates: Partial<Channel>) => Promise<void>
+  onDelete: (ch: Channel) => Promise<void>
+}) {
+  const [editingName, setEditingName] = useState(false)
+  const [nameDraft, setNameDraft] = useState(channel.name)
+  const [editingGroup, setEditingGroup] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
+  const commitName = async () => {
+    setEditingName(false)
+    const trimmed = nameDraft.trim()
+    if (trimmed && trimmed !== channel.name) {
+      await onEdit(channel.id, { name: trimmed })
+      toast.success(`Канал переименован: ${trimmed}`)
+    } else {
+      setNameDraft(channel.name)
+    }
+  }
+
+  const commitField = async (field: 'budget' | 'rl' | 'sr', value: number) => {
+    if (value === channel[field]) return
+    await onEdit(channel.id, { [field]: value })
+  }
+
+  const commitGroup = async (newGroup: string) => {
+    setEditingGroup(false)
+    if (newGroup !== channel.group) {
+      await onEdit(channel.id, { group: newGroup })
+      toast.success(`Группа изменена: ${newGroup}`)
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-[hsl(220,23%,98%)]">
+      {/* Name (click to edit) */}
+      <div className="flex-1 min-w-0">
+        {editingName ? (
+          <input
+            autoFocus
+            type="text"
+            value={nameDraft}
+            onChange={(e) => setNameDraft(e.target.value)}
+            onBlur={commitName}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitName()
+              if (e.key === 'Escape') { setEditingName(false); setNameDraft(channel.name) }
+            }}
+            className="w-full h-6 px-1.5 text-xs border border-[hsl(221,60%,38%)] rounded focus:outline-none"
+          />
+        ) : (
+          <span
+            className="block truncate cursor-text hover:bg-[hsl(217,91%,95%)] px-1.5 py-0.5 rounded"
+            onClick={() => { setNameDraft(channel.name); setEditingName(true) }}
+            title="Клик для переименования"
+          >
+            {channel.name}
+          </span>
+        )}
+      </div>
+
+      {/* Group (click to change) */}
+      {editingGroup ? (
+        <select
+          autoFocus
+          value={channel.group}
+          onChange={(e) => commitGroup(e.target.value)}
+          onBlur={() => setEditingGroup(false)}
+          className="h-6 px-1 text-[10px] border border-[hsl(221,60%,38%)] rounded focus:outline-none bg-white"
+        >
+          {GROUPS.map((g) => <option key={g} value={g}>{g}</option>)}
+        </select>
+      ) : (
+        <button
+          onClick={() => setEditingGroup(true)}
+          className="text-[10px] text-[hsl(215,16%,47%)] hover:text-[hsl(221,60%,38%)] hover:underline px-1.5 py-0.5 rounded bg-[hsl(220,20%,95%)]"
+          title="Клик для смены группы"
+        >
+          {channel.group}
+        </button>
+      )}
+
+      {/* Budget */}
+      <ChannelNumberField
+        value={channel.budget}
+        onCommit={(v) => commitField('budget', v)}
+        format="currency"
+        label="Бюдж"
+      />
+      {/* RL */}
+      <ChannelNumberField
+        value={channel.rl}
+        onCommit={(v) => commitField('rl', v)}
+        label="РЛ"
+      />
+      {/* SR */}
+      <ChannelNumberField
+        value={channel.sr}
+        onCommit={(v) => commitField('sr', v)}
+        suffix="%"
+        label="SR"
+      />
+
+      {/* Delete button */}
+      {confirmDelete ? (
+        <div className="flex items-center gap-1">
+          <Button size="sm" variant="destructive" className="h-6 px-2 text-[10px]" onClick={() => onDelete(channel)}>
+            <Trash2 className="w-3 h-3 mr-1" /> Да
+          </Button>
+          <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => setConfirmDelete(false)}>
+            Нет
+          </Button>
+        </div>
+      ) : (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-6 px-2 text-[hsl(0,72%,51%)] hover:bg-[hsl(0,70%,96%)]"
+          onClick={() => setConfirmDelete(true)}
+          title={`Удалить канал "${channel.name}"`}
+          aria-label={`Удалить канал ${channel.name}`}
+        >
+          <Trash2 className="w-3 h-3" />
+        </Button>
+      )}
+    </div>
+  )
+}
+
+// Number field with inline editing
+function ChannelNumberField({ value, onCommit, format, suffix, label }: {
+  value: number
+  onCommit: (v: number) => void
+  format?: 'currency'
+  suffix?: string
+  label: string
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+
+  const display = format === 'currency' ? formatNumber(value) : String(value)
+
+  if (editing) {
+    return (
+      <div className="flex flex-col">
+        <span className="text-[8px] text-[hsl(215,16%,47%)] uppercase">{label}</span>
+        <input
+          autoFocus
+          type="number"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => { setEditing(false); onCommit(Number(draft) || 0) }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { setEditing(false); onCommit(Number(draft) || 0) }
+            if (e.key === 'Escape') setEditing(false)
+          }}
+          className="w-16 h-6 px-1 text-[10px] text-right border border-[hsl(221,60%,38%)] rounded focus:outline-none"
+        />
+      </div>
+    )
+  }
+  return (
+    <div className="flex flex-col" title="Клик для редактирования">
+      <span className="text-[8px] text-[hsl(215,16%,47%)] uppercase">{label}</span>
+      <button
+        onClick={() => { setDraft(String(value)); setEditing(true) }}
+        className="text-[10px] text-right tabular-nums px-1 py-0.5 rounded hover:bg-[hsl(217,91%,95%)] cursor-text min-w-16"
+      >
+        {display}{suffix}
+      </button>
+    </div>
   )
 }
