@@ -34,10 +34,11 @@ function calcPlanCPL(budget: number, rl: number): number {
 function calcTotalLeads(days: Record<number, number>): number {
   return Object.values(days).reduce((s, v) => s + v, 0)
 }
-// CPL факт = ΣЛ (фактический трафик) × план CPL
-// (по логике пользователя: кол-во трафика по источнику × план CPL = факт CPL)
-function calcFactCPL(totalLeads: number, planCpl: number): number {
-  return totalLeads * planCpl
+// CPL факт = (ΣЛ × план CPL) / контракты
+// Логика: "факт бюджет" = кол-во трафика × план CPL, затем / контракты = стоимость 1 контракта
+function calcFactCPL(totalLeads: number, planCpl: number, contracts: number): number {
+  if (contracts <= 0) return 0
+  return (totalLeads * planCpl) / contracts
 }
 function calcFactSR(contractsFact: number, totalLeads: number): number {
   return contractsFact > 0 && totalLeads > 0 ? (contractsFact / totalLeads) * 100 : 0
@@ -167,7 +168,7 @@ export function PlanFactTab() {
       factIssuedSum += cf?.issued ?? 0
     }
     const planCpl = totalRl > 0 ? budget / totalRl : 0
-    const factCpl = calcFactCPL(totalLeads, planCpl)
+    const factCpl = calcFactCPL(totalLeads, planCpl, factContractsSum)
     const factSR = calcFactSR(factContractsSum, totalLeads)
     return {
       budget, totalLeads, totalRl,
@@ -188,7 +189,8 @@ export function PlanFactTab() {
       const p = getPlan(ch.name)
       const tl = calcTotalLeads(p.days)
       const planCpl = calcPlanCPL(p.budget, p.rl)
-      const factCpl = calcFactCPL(tl, planCpl)
+      const cf = data?.channelFacts?.[ch.name]
+      const factCpl = calcFactCPL(tl, planCpl, cf?.contracts ?? 0)
       const factSr = calcFactSR(0, tl) // per-channel fact not tracked
       rows.push([
         ch.name, ch.group,
@@ -298,19 +300,21 @@ export function PlanFactTab() {
                   const chs = groupedChannels[group] ?? []
                   if (chs.length === 0) return null
                   let gBudget = 0, gLeads = 0, gRl = 0, gFactC = 0, gFactI = 0
-                  let gFactCplSum = 0
+                  let gFactBudgetSum = 0 // Σ (ΣЛ × планCPL) по каналам
                   for (const ch of chs) {
                     const p = getPlan(ch.name)
                     gBudget += p.budget
                     gLeads += calcTotalLeads(p.days)
                     gRl += p.rl
-                    // Факт CPL = ΣЛ × план CPL (сумма по каналам группы)
+                    // Факт бюджет = ΣЛ × план CPL
                     const chPlanCpl = calcPlanCPL(p.budget, p.rl)
-                    gFactCplSum += calcFactCPL(calcTotalLeads(p.days), chPlanCpl)
+                    gFactBudgetSum += calcTotalLeads(p.days) * chPlanCpl
                     const cf = data?.channelFacts?.[ch.name]
                     gFactC += cf?.contracts ?? 0
                     gFactI += cf?.issued ?? 0
                   }
+                  // CPL факт группы = Σ факт бюджет / Σ контракты
+                  const gFactCpl = gFactC > 0 ? gFactBudgetSum / gFactC : 0
                   return (
                     <FragmentGroup
                       key={group}
@@ -327,7 +331,7 @@ export function PlanFactTab() {
                       groupBudget={gBudget}
                       groupLeads={gLeads}
                       groupRl={gRl}
-                      groupFactCpl={gFactCplSum}
+                      groupFactCpl={gFactCpl}
                       groupFactContracts={gFactC}
                       groupFactIssued={gFactI}
                     />
@@ -350,7 +354,7 @@ export function PlanFactTab() {
                     return <td key={day} className="border border-[hsl(220,16%,90%)] px-0.5 py-1 text-center tabular-nums">{sum || ''}</td>
                   })}
                   <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(289,60%,90%)] tabular-nums">{formatNumber(grandTotals.budget)}</td>
-                  <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(289,60%,90%)] tabular-nums" title="= Σ (ΣЛ × план CPL) по всем каналам">
+                  <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(289,60%,90%)] tabular-nums" title="= Σ (ΣЛ × план CPL) / Σ контракты по всем каналам">
                     {grandTotals.factCpl > 0 ? formatNumber(Math.round(grandTotals.factCpl)) : '—'}
                   </td>
                   <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(289,60%,90%)] tabular-nums" title="РЛ факт = Σ дней по всем каналам">{grandTotals.totalLeads}</td>
@@ -369,7 +373,7 @@ export function PlanFactTab() {
           <span className="font-semibold text-[hsl(215,28%,22%)]">📐 Формулы (по Excel):</span>
           <span><code className="bg-white px-1 rounded">CPL (план) = Бюджет / РЛ</code></span>
           <span><code className="bg-white px-1 rounded">ΣЛ = SUM(дней)</code></span>
-          <span><code className="bg-white px-1 rounded">CPL (факт) = ΣЛ × план CPL</code></span>
+          <span><code className="bg-white px-1 rounded">CPL (факт) = (ΣЛ × план CPL) / контракты</code></span>
           <span><code className="bg-white px-1 rounded">SR% (факт) = К.факт / ΣЛ × 100</code></span>
           <span className="text-[hsl(142,60%,35%)]"><code className="bg-white px-1 rounded">К.факт, В.факт — вводятся вручную</code></span>
         </div>
@@ -432,7 +436,7 @@ function FragmentGroup({
         const cf = getChannelFact(ch.name)
         const totalLeads = calcTotalLeads(p.days)
         const planCpl = calcPlanCPL(p.budget, p.rl)
-        const factCpl = calcFactCPL(totalLeads, planCpl)
+        const factCpl = calcFactCPL(totalLeads, planCpl, cf.contracts)
         const factSr = calcFactSR(cf.contracts, totalLeads)
         return (
           <tr key={ch.id} className="hover:bg-[hsl(220,23%,97%)]">
@@ -453,7 +457,7 @@ function FragmentGroup({
             })}
             {/* ФАКТ */}
             <td className="border border-[hsl(220,16%,90%)] px-1 py-0.5 text-center bg-[hsl(289,60%,95%)] tabular-nums" title="Бюджет = план">{formatNumber(p.budget)}</td>
-            <td className="border border-[hsl(220,16%,90%)] px-1 py-0.5 text-center bg-[hsl(289,60%,95%)] tabular-nums" title={`= ΣЛ × план CPL = ${totalLeads} × ${planCpl.toFixed(0)}`}>
+            <td className="border border-[hsl(220,16%,90%)] px-1 py-0.5 text-center bg-[hsl(289,60%,95%)] tabular-nums" title={`= (ΣЛ × план CPL) / контракты = (${totalLeads} × ${planCpl.toFixed(0)}) / ${cf.contracts}`}>
               {factCpl > 0 ? formatNumber(Math.round(factCpl)) : '—'}
             </td>
             <td className="border border-[hsl(220,16%,90%)] px-1 py-0.5 text-center bg-[hsl(289,60%,95%)] tabular-nums font-semibold" title="= Σ дней">{totalLeads || ''}</td>

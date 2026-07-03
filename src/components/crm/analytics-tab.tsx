@@ -101,24 +101,37 @@ export function AnalyticsTab() {
     return { count, jok, j, o, k, ti, kr }
   }, [groups])
 
-  // 5 KPI metrics based on РИСК + статус:
-  // - Выдано: РИСК=1 (выданные автомобили)
-  // - Оплачено: РИСК=2 (оплаченные)
-  // - Предоплата: РИСК=3 (предоплата)
-  // - Перекат: РИСК=4 + статус Призрак или Склад (поставка/перекат)
-  // - Отказ: РИСК=4 + статус Отказ
+  // 4 статуса по РИСК + статус сделки:
+  // - Выдача: РИСК=1
+  // - Склад: РИСК=2 (оплаченные → на складе)
+  // - Перекат: РИСК=3 (предоплата) ИЛИ РИСК=4 + Призрак/Склад
+  // - Отказ: РИСК=4 + Отказ
+  // Для каждого статуса считаем 4 метрики: штуки, ЖОК, КР, ТИ
+  type StatusKey = 'vydacha' | 'sklad' | 'perekat' | 'otkaz'
   const kpiMetrics = useMemo(() => {
-    let vydano = 0, oplacheno = 0, predoplata = 0, perekat = 0, otkaz = 0
-    for (const d of filteredDeals) {
-      if (d.risk === '1') vydano++
-      else if (d.risk === '2') oplacheno++
-      else if (d.risk === '3') predoplata++
-      else if (d.risk === '4') {
-        if (d.status === 'Отказ') otkaz++
-        else if (d.status === 'Призрак' || d.status === 'Склад') perekat++
-      }
+    const init = () => ({ count: 0, jok: 0, kr: 0, ti: 0 })
+    const out: Record<StatusKey, { count: number; jok: number; kr: number; ti: number }> = {
+      vydacha: init(),
+      sklad: init(),
+      perekat: init(),
+      otkaz: init(),
     }
-    return { vydano, oplacheno, predoplata, perekat, otkaz }
+    for (const d of filteredDeals) {
+      let key: StatusKey | null = null
+      if (d.risk === '1') key = 'vydacha'
+      else if (d.risk === '2') key = 'sklad'
+      else if (d.risk === '3') key = 'perekat'
+      else if (d.risk === '4') {
+        if (d.status === 'Отказ') key = 'otkaz'
+        else if (d.status === 'Призрак' || d.status === 'Склад') key = 'perekat'
+      }
+      if (!key) continue
+      out[key].count++
+      out[key].jok += d.jok || 0
+      if (d.kr === '1') out[key].kr++
+      if (d.ti === '1' || d.ti === '2') out[key].ti++
+    }
+    return out
   }, [filteredDeals])
 
   const setFilter = (key: keyof FilterState, value: string) => {
@@ -184,13 +197,44 @@ export function AnalyticsTab() {
         )}
       </Card>
 
-      {/* KPI cards — 5 metrics based on РИСК + статус */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-        <KpiCard label="🚗 Выдано" value={formatNumber(kpiMetrics.vydano)} color="hsl(142,60%,35%)" sub="РИСК=1" />
-        <KpiCard label="💰 Оплачено" value={formatNumber(kpiMetrics.oplacheno)} color="hsl(217,91%,45%)" sub="РИСК=2" />
-        <KpiCard label="💳 Предоплата" value={formatNumber(kpiMetrics.predoplata)} color="hsl(38,90%,40%)" sub="РИСК=3" />
-        <KpiCard label="🔄 Перекат" value={formatNumber(kpiMetrics.perekat)} color="hsl(280,40%,45%)" sub="РИСК=4 + Призрак/Склад" />
-        <KpiCard label="❌ Отказ" value={formatNumber(kpiMetrics.otkaz)} color="hsl(0,72%,50%)" sub="РИСК=4 + Отказ" />
+      {/* KPI — 4 квадрата (Штуки | ЖОК | КР | ТИ), в каждом 4 статуса по центру */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <KpiSquare
+          title="Штуки"
+          data={[
+            { label: 'Выдача', value: kpiMetrics.vydacha.count, color: 'hsl(142,60%,35%)' },
+            { label: 'Склад', value: kpiMetrics.sklad.count, color: 'hsl(38,90%,40%)' },
+            { label: 'Перекат', value: kpiMetrics.perekat.count, color: 'hsl(280,40%,45%)' },
+            { label: 'Отказ', value: kpiMetrics.otkaz.count, color: 'hsl(0,72%,50%)' },
+          ]}
+        />
+        <KpiSquare
+          title="ЖОК (₽)"
+          data={[
+            { label: 'Выдача', value: kpiMetrics.vydacha.jok, color: 'hsl(142,60%,35%)', format: 'currency' },
+            { label: 'Склад', value: kpiMetrics.sklad.jok, color: 'hsl(38,90%,40%)', format: 'currency' },
+            { label: 'Перекат', value: kpiMetrics.perekat.jok, color: 'hsl(280,40%,45%)', format: 'currency' },
+            { label: 'Отказ', value: kpiMetrics.otkaz.jok, color: 'hsl(0,72%,50%)', format: 'currency' },
+          ]}
+        />
+        <KpiSquare
+          title="КР"
+          data={[
+            { label: 'Выдача', value: kpiMetrics.vydacha.kr, color: 'hsl(142,60%,35%)' },
+            { label: 'Склад', value: kpiMetrics.sklad.kr, color: 'hsl(38,90%,40%)' },
+            { label: 'Перекат', value: kpiMetrics.perekat.kr, color: 'hsl(280,40%,45%)' },
+            { label: 'Отказ', value: kpiMetrics.otkaz.kr, color: 'hsl(0,72%,50%)' },
+          ]}
+        />
+        <KpiSquare
+          title="ТИ"
+          data={[
+            { label: 'Выдача', value: kpiMetrics.vydacha.ti, color: 'hsl(142,60%,35%)' },
+            { label: 'Склад', value: kpiMetrics.sklad.ti, color: 'hsl(38,90%,40%)' },
+            { label: 'Перекат', value: kpiMetrics.perekat.ti, color: 'hsl(280,40%,45%)' },
+            { label: 'Отказ', value: kpiMetrics.otkaz.ti, color: 'hsl(0,72%,50%)' },
+          ]}
+        />
       </div>
 
       {/* Analytics table */}
@@ -283,6 +327,35 @@ function KpiCard({ label, value, color, sub }: { label: string; value: string; c
       <div className="text-[10px] text-[hsl(215,16%,47%)] uppercase tracking-wide font-medium">{label}</div>
       <div className="text-2xl font-bold tabular-nums" style={{ color }}>{value}</div>
       {sub && <div className="text-[9px] text-[hsl(215,16%,60%)]">{sub}</div>}
+    </Card>
+  )
+}
+
+// KpiSquare — квадрат с заголовком и 4 статусами по центру
+function KpiSquare({ title, data }: {
+  title: string
+  data: { label: string; value: number; color: string; format?: 'currency' }[]
+}) {
+  const fmt = (v: number, format?: 'currency') =>
+    format === 'currency' ? formatNumber(v) : String(v)
+  return (
+    <Card className="overflow-hidden crm-card-shadow border-[hsl(220,16%,90%)]">
+      <div className="bg-[hsl(221,60%,38%)] text-white px-3 py-1.5 text-xs font-semibold text-center uppercase tracking-wide">
+        {title}
+      </div>
+      <div className="divide-y">
+        {data.map((row) => (
+          <div key={row.label} className="flex items-center justify-between px-3 py-2 text-center">
+            <div className="text-[11px] text-[hsl(215,16%,47%)] font-medium flex-1 text-left">
+              {row.label}
+            </div>
+            <div className="text-lg font-bold tabular-nums flex-1 text-center" style={{ color: row.color }}>
+              {fmt(row.value, row.format)}
+            </div>
+            <div className="flex-1"></div>
+          </div>
+        ))}
+      </div>
     </Card>
   )
 }
