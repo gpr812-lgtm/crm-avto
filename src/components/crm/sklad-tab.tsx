@@ -1,8 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useCrmStore } from '@/lib/store'
-import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -13,6 +12,9 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
 } from '@/components/ui/context-menu'
 import {
   DropdownMenu,
@@ -23,18 +25,17 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import {
   Plus, Download, Upload, Trash2, Copy, ArrowUp, ArrowDown, Link as LinkIcon,
-  ExternalLink, Filter, Printer, ChevronUp, ChevronDown, FileSpreadsheet,
+  ExternalLink, Filter, Printer, ChevronUp, ChevronDown, FileSpreadsheet, X,
 } from 'lucide-react'
-import { formatNumber, parseRuNumber } from '@/lib/utils-crm'
+import { formatNumber, parseRuNumber, highlightMatch } from '@/lib/utils-crm'
 import { toast } from 'sonner'
 import type { Deal, DealColumn } from '@/lib/types'
 
@@ -50,6 +51,14 @@ interface FilterState {
   [key: string]: string
 }
 
+const COLUMN_TYPES = [
+  { value: 'text', label: 'Текст' },
+  { value: 'number', label: 'Число' },
+  { value: 'date', label: 'Дата' },
+  { value: 'select', label: 'Список' },
+  { value: 'url', label: 'Ссылка' },
+]
+
 export function SkladTab({ deals, columns, options }: SkladTabProps) {
   const {
     selectedDealIds,
@@ -60,10 +69,15 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
     removeDealsBulk,
     duplicateDealsBulk,
     editDeal,
+    addDeal,
     evalLinks,
     saveEvalLink,
     removeEvalLink,
     addOption,
+    saveColumn,
+    addColumn,
+    removeColumn,
+    importDeals,
   } = useCrmStore()
 
   const [filters, setFilters] = useState<FilterState>({})
@@ -71,8 +85,14 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
   const [sortDir, setSortDir] = useState<SortDir>(null)
   const [linkDialog, setLinkDialog] = useState<{ dealId: string; currentUrl?: string } | null>(null)
   const [linkInput, setLinkInput] = useState('')
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+  const [columnDialog, setColumnDialog] = useState<{ mode: 'create' | 'rename' | 'changeType'; col?: DealColumn; insertAfter?: string } | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
 
-  // Filter dropdowns: only first 4 select-type columns
+  const importFileRef = useRef<HTMLInputElement>(null)
+  const csvFileRef = useRef<HTMLInputElement>(null)
+
+  // Filter dropdowns: first 4 select-type columns
   const filterColumns = useMemo(() => {
     return columns.filter((c) => c.type === 'select').slice(0, 4)
   }, [columns])
@@ -80,15 +100,11 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
   // Apply filters and sort
   const filteredDeals = useMemo(() => {
     let result = [...deals]
-
-    // Apply filters
     for (const [key, value] of Object.entries(filters)) {
       if (value) {
         result = result.filter((d) => String((d as Record<string, unknown>)[key] ?? '') === value)
       }
     }
-
-    // Apply sort
     if (sortKey && sortDir) {
       result.sort((a, b) => {
         const av = (a as Record<string, unknown>)[sortKey]
@@ -103,11 +119,10 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
           : String(bv ?? '').localeCompare(String(av ?? ''))
       })
     }
-
     return result
   }, [deals, filters, sortKey, sortDir])
 
-  // Compute totals for number columns
+  // Totals for number columns
   const totals = useMemo(() => {
     const t: Record<string, number> = {}
     for (const c of columns) {
@@ -120,13 +135,11 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
 
   const toggleSort = (key: string) => {
     if (sortKey !== key) {
-      setSortKey(key)
-      setSortDir('asc')
+      setSortKey(key); setSortDir('asc')
     } else if (sortDir === 'asc') {
       setSortDir('desc')
     } else if (sortDir === 'desc') {
-      setSortKey(null)
-      setSortDir(null)
+      setSortKey(null); setSortDir(null)
     } else {
       setSortDir('asc')
     }
@@ -135,11 +148,8 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
   const handleCellEdit = async (deal: Deal, key: string, value: string, col: DealColumn) => {
     const oldValue = String((deal as Record<string, unknown>)[key] ?? '')
     if (oldValue === value) return
-
     let parsed: string | number = value
-    if (col.type === 'number') {
-      parsed = parseRuNumber(value)
-    }
+    if (col.type === 'number') parsed = parseRuNumber(value)
     try {
       await editDeal(deal.id, { [key]: parsed })
     } catch (e) {
@@ -150,6 +160,29 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
   const handleDuplicate = async (deal: Deal) => {
     await duplicateDealsBulk([deal.id])
     toast.success('Сделка дублирована')
+  }
+
+  const handleInsertAbove = async (deal: Deal) => {
+    // Insert an empty row above (decrement orders of this deal and below, then create new)
+    const newDeal: Partial<Deal> = {}
+    for (const col of columns) {
+      ;(newDeal as Record<string, unknown>)[col.key] = col.type === 'number' ? 0 : col.default ?? ''
+    }
+    newDeal.order = deal.order
+    // Shift this deal and below by +1
+    await editDeal(deal.id, { order: deal.order + 1 })
+    await addDeal(newDeal)
+    toast.success('Строка добавлена выше')
+  }
+
+  const handleInsertBelow = async (deal: Deal) => {
+    const newDeal: Partial<Deal> = {}
+    for (const col of columns) {
+      ;(newDeal as Record<string, unknown>)[col.key] = col.type === 'number' ? 0 : col.default ?? ''
+    }
+    newDeal.order = deal.order + 1
+    await addDeal(newDeal)
+    toast.success('Строка добавлена ниже')
   }
 
   const handleDelete = async (deal: Deal) => {
@@ -211,11 +244,11 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
     toast.success('CSV экспортирован')
   }
 
-  // Excel Export (simple HTML table — opens in Excel)
+  // Excel Export (HTML table opens in Excel)
   const handleExportExcel = () => {
     const headers = columns.map((c) => c.label)
     const rows = filteredDeals.map((d) =>
-      columns.map((c) => String((d as Record<string, unknown>)[c.key] ?? ''))
+      columns.map((c) => String((d as Record<string, unknown>)[c.key] ?? '')),
     )
     const html = `
       <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
@@ -234,8 +267,143 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
     toast.success('Excel экспортирован')
   }
 
-  const handlePrint = () => window.print()
+  // CSV Import
+  const handleImportCSVFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const text = await file.text()
+      // Parse CSV: split by \r\n or \n, then by ; (handle quoted)
+      const lines = text.split(/\r\n|\n/).filter((l) => l.trim() && !l.startsWith('\ufeff'))
+      if (lines.length === 0) throw new Error('Empty CSV')
 
+      // Parse a single CSV line accounting for quoted values
+      const parseLine = (line: string): string[] => {
+        const out: string[] = []
+        let cur = ''
+        let inQuotes = false
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i]
+          if (ch === '"') {
+            if (inQuotes && line[i + 1] === '"') { cur += '"'; i++ }
+            else inQuotes = !inQuotes
+          } else if (ch === ';' && !inQuotes) {
+            out.push(cur); cur = ''
+          } else {
+            cur += ch
+          }
+        }
+        out.push(cur)
+        return out
+      }
+
+      const header = parseLine(lines[0]).map((h) => h.trim())
+      // Map header labels to column keys
+      const labelToKey = new Map(columns.map((c) => [c.label.toLowerCase(), c.key]))
+      const keyIndexes: { key: string; idx: number }[] = []
+      header.forEach((h, i) => {
+        const k = labelToKey.get(h.toLowerCase())
+        if (k) keyIndexes.push({ key: k, idx: i })
+      })
+
+      if (keyIndexes.length === 0) {
+        // Try by key directly
+        const keySet = new Set(columns.map((c) => c.key))
+        header.forEach((h, i) => {
+          if (keySet.has(h)) keyIndexes.push({ key: h, idx: i })
+        })
+      }
+
+      if (keyIndexes.length === 0) {
+        throw new Error('Не удалось сопоставить заголовки CSV с колонками таблицы')
+      }
+
+      const rows: Record<string, unknown>[] = []
+      for (let i = 1; i < lines.length; i++) {
+        const cells = parseLine(lines[i])
+        const row: Record<string, unknown> = {}
+        for (const { key, idx } of keyIndexes) {
+          const col = columns.find((c) => c.key === key)
+          const val = cells[idx] ?? ''
+          if (col?.type === 'number') {
+            row[key] = parseRuNumber(val)
+          } else {
+            row[key] = val
+          }
+        }
+        rows.push(row)
+      }
+
+      const imported = await importDeals(rows, 'append')
+      toast.success(`Импортировано ${imported} сделок`)
+    } catch (err) {
+      console.error(err)
+      toast.error(`Ошибка импорта CSV: ${err instanceof Error ? err.message : 'неизвестная'}`)
+    } finally {
+      if (csvFileRef.current) csvFileRef.current.value = ''
+    }
+  }
+
+  // Column actions
+  const handleRenameColumn = (col: DealColumn) => {
+    setColumnDialog({ mode: 'rename', col })
+  }
+
+  const handleChangeColumnType = (col: DealColumn) => {
+    setColumnDialog({ mode: 'changeType', col })
+  }
+
+  const handleInsertColumnLeft = (col: DealColumn) => {
+    // Find previous column to insert after
+    const idx = columns.findIndex((c) => c.id === col.id)
+    const prevCol = idx > 0 ? columns[idx - 1] : undefined
+    setColumnDialog({ mode: 'create', insertAfter: prevCol?.key })
+  }
+
+  const handleInsertColumnRight = (col: DealColumn) => {
+    setColumnDialog({ mode: 'create', insertAfter: col.key })
+  }
+
+  const handleDeleteColumn = async (col: DealColumn) => {
+    if (!confirm(`Удалить колонку "${col.label}"?\nДанные в этой колонке будут потеряны.`)) return
+    await removeColumn(col.id)
+    toast.success('Колонка удалена')
+  }
+
+  // Bulk delete by filters
+  const [bulkDeleteFilters, setBulkDeleteFilters] = useState<{ status: string; model: string; dateFrom: string; dateTo: string }>({
+    status: '', model: '', dateFrom: '', dateTo: '',
+  })
+  const bulkDeleteCount = useMemo(() => {
+    return deals.filter((d) => {
+      if (bulkDeleteFilters.status && d.status !== bulkDeleteFilters.status) return false
+      if (bulkDeleteFilters.model && d.model !== bulkDeleteFilters.model) return false
+      if (bulkDeleteFilters.dateFrom && d.dateDkp && d.dateDkp < bulkDeleteFilters.dateFrom) return false
+      if (bulkDeleteFilters.dateTo && d.dateDkp && d.dateDkp > bulkDeleteFilters.dateTo) return false
+      return true
+    }).length
+  }, [deals, bulkDeleteFilters])
+
+  const handleBulkDeleteByFilters = async () => {
+    if (bulkDeleteCount === 0) {
+      toast.warning('Нет сделок под выбранные фильтры')
+      return
+    }
+    if (!confirm(`Удалить ${bulkDeleteCount} сделок по фильтрам?`)) return
+    const ids = deals.filter((d) => {
+      if (bulkDeleteFilters.status && d.status !== bulkDeleteFilters.status) return false
+      if (bulkDeleteFilters.model && d.model !== bulkDeleteFilters.model) return false
+      if (bulkDeleteFilters.dateFrom && d.dateDkp && d.dateDkp < bulkDeleteFilters.dateFrom) return false
+      if (bulkDeleteFilters.dateTo && d.dateDkp && d.dateDkp > bulkDeleteFilters.dateTo) return false
+      return true
+    }).map((d) => d.id)
+    await removeDealsBulk(ids)
+    setBulkDeleteOpen(false)
+    setBulkDeleteFilters({ status: '', model: '', dateFrom: '', dateTo: '' })
+    toast.success(`Удалено ${ids.length} сделок`)
+  }
+
+  const handlePrint = () => window.print()
   const allSelected = filteredDeals.length > 0 && filteredDeals.every((d) => selectedDealIds.has(d.id))
 
   // Empty state
@@ -246,8 +414,12 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
           <div className="text-5xl mb-3">📦</div>
           <h2 className="text-lg font-semibold mb-2">Список сделок пуст</h2>
           <p className="text-sm text-[#7f8c8d] mb-4">
-            Нажмите «Сделка» в шапке, чтобы добавить первую запись.
+            Нажмите «Сделка» в шапке, чтобы добавить запись, или импортируйте CSV.
           </p>
+          <Button onClick={() => csvFileRef.current?.click()} variant="outline" size="sm">
+            <Upload className="w-3.5 h-3.5 mr-1" /> Импорт CSV
+          </Button>
+          <input ref={csvFileRef} type="file" accept=".csv" onChange={handleImportCSVFile} className="hidden" />
         </div>
       </div>
     )
@@ -274,10 +446,7 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
             ))}
           </select>
         ))}
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 text-xs"
+        <Button size="sm" variant="ghost" className="h-7 text-xs"
           onClick={() => setFilters({})}
           disabled={Object.values(filters).every((v) => !v)}
         >
@@ -291,32 +460,37 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
             <Badge variant="secondary" className="bg-[#e8f0fe] text-[#1a73e8]">
               Выбрано: {selectedDealIds.size}
             </Badge>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs"
+            <Button size="sm" variant="outline" className="h-7 text-xs"
               onClick={() => duplicateDealsBulk(Array.from(selectedDealIds))}
             >
               <Copy className="w-3 h-3 mr-1" /> Дублировать
             </Button>
-            <Button
-              size="sm"
-              variant="destructive"
-              className="h-7 text-xs"
-              onClick={handleBulkDelete}
-            >
+            <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={handleBulkDelete}>
               <Trash2 className="w-3 h-3 mr-1" /> Удалить выбранные
             </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 text-xs"
-              onClick={clearSelection}
-            >
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={clearSelection}>
               Снять выделение
             </Button>
           </>
         )}
+
+        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setBulkDeleteOpen(true)}>
+          <Trash2 className="w-3 h-3 mr-1" /> По фильтрам
+        </Button>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm" variant="outline" className="h-7 text-xs">
+              <Upload className="w-3 h-3 mr-1" /> Импорт
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onClick={() => csvFileRef.current?.click()}>
+              <Upload className="w-3.5 h-3.5 mr-2" /> CSV
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <input ref={csvFileRef} type="file" accept=".csv" onChange={handleImportCSVFile} className="hidden" />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -344,27 +518,26 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
         <table className="w-full border-collapse text-xs">
           <thead>
             <tr className="bg-[#f1f3f4]">
-              <th className="border border-[#dadce0] px-2 py-1.5 w-8 sticky left-0 z-20">
-                <Checkbox
-                  checked={allSelected}
-                  onCheckedChange={(v) => (v ? selectAll() : clearSelection())}
-                />
+              <th className="border border-[#dadce0] px-2 py-1.5 w-8 sticky left-0 z-20 bg-[#f1f3f4]">
+                <Checkbox checked={allSelected} onCheckedChange={(v) => (v ? selectAll() : clearSelection())} />
               </th>
               <th className="border border-[#dadce0] px-2 py-1.5 w-10">№</th>
               {columns.map((col) => (
                 <th
                   key={col.key}
-                  className="border border-[#dadce0] px-2 py-1.5 cursor-pointer select-none whitespace-nowrap hover:bg-[#e8f0fe]"
+                  className="border border-[#dadce0] px-2 py-1.5 select-none whitespace-nowrap hover:bg-[#e8f0fe] group relative"
                   style={{ minWidth: col.width, width: col.width }}
-                  onClick={() => toggleSort(col.key)}
                 >
-                  <div className="flex items-center justify-center gap-1">
-                    <span>{col.label}</span>
-                    {sortKey === col.key && (
-                      sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> :
-                      sortDir === 'desc' ? <ChevronDown className="w-3 h-3" /> : null
-                    )}
-                  </div>
+                  <HeaderCell
+                    col={col}
+                    sortDir={sortKey === col.key ? sortDir : null}
+                    onSort={() => toggleSort(col.key)}
+                    onRename={() => handleRenameColumn(col)}
+                    onChangeType={() => handleChangeColumnType(col)}
+                    onInsertLeft={() => handleInsertColumnLeft(col)}
+                    onInsertRight={() => handleInsertColumnRight(col)}
+                    onDelete={() => handleDeleteColumn(col)}
+                  />
                 </th>
               ))}
             </tr>
@@ -383,10 +556,7 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
                   <ContextMenuTrigger asChild>
                     <tr className={`${rowClass} ${isSelected ? 'ring-2 ring-[#1a73e8] ring-inset' : ''} hover:bg-[#f8f9fa]/70`}>
                       <td className="border border-[#e0e0e0] px-2 py-1 text-center sticky left-0 z-10 bg-inherit">
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={() => toggleSelection(deal.id)}
-                        />
+                        <Checkbox checked={isSelected} onCheckedChange={() => toggleSelection(deal.id)} />
                       </td>
                       <td className="border border-[#e0e0e0] px-2 py-1 text-center text-[#7f8c8d]">{idx + 1}</td>
                       {columns.map((col) => (
@@ -411,6 +581,13 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
                     <ContextMenuItem onClick={() => handleDuplicate(deal)}>
                       <Copy className="w-3.5 h-3.5 mr-2" /> Дублировать
                     </ContextMenuItem>
+                    <ContextMenuItem onClick={() => handleInsertAbove(deal)}>
+                      <ArrowUp className="w-3.5 h-3.5 mr-2" /> Вставить выше
+                    </ContextMenuItem>
+                    <ContextMenuItem onClick={() => handleInsertBelow(deal)}>
+                      <ArrowDown className="w-3.5 h-3.5 mr-2" /> Вставить ниже
+                    </ContextMenuItem>
+                    <ContextMenuSeparator />
                     <ContextMenuItem onClick={() => setLinkDialog({ dealId: deal.id, currentUrl: evalLinks[deal.id] })}>
                       <LinkIcon className="w-3.5 h-3.5 mr-2" /> Ссылка ТИ
                     </ContextMenuItem>
@@ -440,7 +617,7 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
       <Dialog open={linkDialog !== null} onOpenChange={(v) => !v && setLinkDialog(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Ссылка ТИ</DialogTitle>
+            <DialogTitle>🔗 Ссылка ТИ</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div>
@@ -455,26 +632,19 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
               />
             </div>
             {linkDialog?.currentUrl && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  if (linkDialog) window.open(linkDialog.currentUrl, '_blank', 'noopener,noreferrer')
-                }}
-              >
+              <Button variant="outline" size="sm" onClick={() => {
+                if (linkDialog) window.open(linkDialog.currentUrl, '_blank', 'noopener,noreferrer')
+              }}>
                 <ExternalLink className="w-3.5 h-3.5 mr-1" /> Открыть текущую
               </Button>
             )}
           </div>
           <DialogFooter>
             {linkDialog?.currentUrl && (
-              <Button
-                variant="destructive"
-                onClick={() => {
-                  if (linkDialog) handleRemoveLink(linkDialog.dealId)
-                  setLinkDialog(null)
-                }}
-              >
+              <Button variant="destructive" onClick={() => {
+                if (linkDialog) handleRemoveLink(linkDialog.dealId)
+                setLinkDialog(null)
+              }}>
                 <Trash2 className="w-3.5 h-3.5 mr-1" /> Удалить
               </Button>
             )}
@@ -483,10 +653,277 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Bulk delete by filters */}
+      <Dialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>🗑️ Массовое удаление по фильтрам</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label>Статус</Label>
+              <select
+                value={bulkDeleteFilters.status}
+                onChange={(e) => setBulkDeleteFilters((f) => ({ ...f, status: e.target.value }))}
+                className="w-full h-9 px-2 text-xs border border-[#ddd] rounded"
+              >
+                <option value="">Все</option>
+                {(options.status ?? []).map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <Label>Модель</Label>
+              <select
+                value={bulkDeleteFilters.model}
+                onChange={(e) => setBulkDeleteFilters((f) => ({ ...f, model: e.target.value }))}
+                className="w-full h-9 px-2 text-xs border border-[#ddd] rounded"
+              >
+                <option value="">Все</option>
+                {(options.model ?? []).map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label>Дата ДКП с</Label>
+                <Input type="date" value={bulkDeleteFilters.dateFrom}
+                  onChange={(e) => setBulkDeleteFilters((f) => ({ ...f, dateFrom: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Дата ДКП по</Label>
+                <Input type="date" value={bulkDeleteFilters.dateTo}
+                  onChange={(e) => setBulkDeleteFilters((f) => ({ ...f, dateTo: e.target.value }))} />
+              </div>
+            </div>
+            <div className="bg-[#fff3cd] border border-[#ffc107] rounded p-2 text-xs text-center">
+              Найдено сделок: <b className="text-[#dc3545]">{bulkDeleteCount}</b>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkDeleteOpen(false)}>Отмена</Button>
+            <Button variant="destructive" onClick={handleBulkDeleteByFilters} disabled={bulkDeleteCount === 0}>
+              <Trash2 className="w-3.5 h-3.5 mr-1" /> Удалить {bulkDeleteCount || ''}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Column dialog (create / rename / changeType) */}
+      <ColumnDialog
+        state={columnDialog}
+        onClose={() => setColumnDialog(null)}
+        columns={columns}
+        onSave={async (data) => {
+          if (columnDialog?.mode === 'rename' && columnDialog.col) {
+            await saveColumn(columnDialog.col.id, { label: data.label })
+            toast.success('Колонка переименована')
+          } else if (columnDialog?.mode === 'changeType' && columnDialog.col) {
+            await saveColumn(columnDialog.col.id, { type: data.type as DealColumn['type'], options: data.type === 'select' ? data.options : null })
+            toast.success('Тип колонки изменён')
+          } else if (columnDialog?.mode === 'create') {
+            await addColumn({
+              key: data.key!,
+              label: data.label,
+              type: data.type,
+              options: data.type === 'select' ? data.options : null,
+              width: 100,
+              insertAfter: columnDialog.insertAfter,
+            })
+            toast.success('Колонка добавлена')
+          }
+          setColumnDialog(null)
+        }}
+      />
     </div>
   )
 }
 
+// ============================
+// Header cell with context menu + sort + resize
+// ============================
+interface HeaderCellProps {
+  col: DealColumn
+  sortDir: SortDir
+  onSort: () => void
+  onRename: () => void
+  onChangeType: () => void
+  onInsertLeft: () => void
+  onInsertRight: () => void
+  onDelete: () => void
+}
+
+function HeaderCell({ col, sortDir, onSort, onRename, onChangeType, onInsertLeft, onInsertRight, onDelete }: HeaderCellProps) {
+  const [width, setWidth] = useState(col.width)
+  const [resizing, setResizing] = useState(false)
+
+  const startResize = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setResizing(true)
+    const startX = e.clientX
+    const startWidth = col.width
+
+    const onMove = (ev: MouseEvent) => {
+      const newWidth = Math.max(40, startWidth + (ev.clientX - startX))
+      setWidth(newWidth)
+    }
+    const onUp = async () => {
+      setResizing(false)
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      // Persist width
+      try {
+        const { useCrmStore } = await import('@/lib/store')
+        useCrmStore.getState().saveColumn(col.id, { width })
+      } catch (e) {
+        console.error('Failed to save width', e)
+      }
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div className="flex items-center justify-center gap-1 cursor-pointer" onClick={onSort}>
+          <span>{col.label}</span>
+          {sortDir === 'asc' && <ChevronUp className="w-3 h-3" />}
+          {sortDir === 'desc' && <ChevronDown className="w-3 h-3" />}
+          <div
+            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-[#2a5298] group-hover:opacity-100"
+            onMouseDown={startResize}
+            style={{ background: resizing ? '#2a5298' : 'transparent' }}
+          />
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem onClick={onRename}>✏️ Переименовать</ContextMenuItem>
+        <ContextMenuItem onClick={onChangeType}>🔄 Изменить тип</ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onClick={onInsertLeft}>⬅️ Вставить слева</ContextMenuItem>
+        <ContextMenuItem onClick={onInsertRight}>➡️ Вставить справа</ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem className="text-[#dc3545]" onClick={onDelete}>🗑️ Удалить колонку</ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  )
+}
+
+// ============================
+// Column create/rename/changeType dialog
+// ============================
+interface ColumnDialogProps {
+  state: { mode: 'create' | 'rename' | 'changeType'; col?: DealColumn; insertAfter?: string } | null
+  onClose: () => void
+  columns: DealColumn[]
+  onSave: (data: { key?: string; label: string; type: string; options?: string | null }) => Promise<void>
+}
+
+function ColumnDialog({ state, onClose, columns, onSave }: ColumnDialogProps) {
+  const [label, setLabel] = useState('')
+  const [key, setKey] = useState('')
+  const [type, setType] = useState('text')
+  const [options, setOptions] = useState('')
+  const { options: allOptions } = useCrmStore()
+
+  // Sync state when dialog opens
+  useMemo(() => {
+    if (!state) return
+    if (state.mode === 'rename' && state.col) {
+      setLabel(state.col.label); setKey(state.col.key); setType(state.col.type)
+    } else if (state.mode === 'changeType' && state.col) {
+      setLabel(state.col.label); setKey(state.col.key); setType(state.col.type); setOptions(state.col.options ?? '')
+    } else {
+      setLabel(''); setKey(`col_${Date.now()}`); setType('text'); setOptions('')
+    }
+  }, [state])
+
+  if (!state) return null
+
+  const title = state.mode === 'create' ? '➕ Новая колонка' : state.mode === 'rename' ? '✏️ Переименовать' : '🔄 Изменить тип'
+
+  return (
+    <Dialog open={state !== null} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          {state.mode === 'create' && (
+            <>
+              <div>
+                <Label>Ключ (латиницей, без пробелов)</Label>
+                <Input value={key} onChange={(e) => setKey(e.target.value)} placeholder="my_column" />
+              </div>
+              <div>
+                <Label>Тип</Label>
+                <Select value={type} onValueChange={setType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {COLUMN_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              {type === 'select' && (
+                <div>
+                  <Label>Справочник</Label>
+                  <Select value={options} onValueChange={setOptions}>
+                    <SelectTrigger><SelectValue placeholder="(выберите)" /></SelectTrigger>
+                    <SelectContent>
+                      {Object.keys(allOptions).map((k) => <SelectItem key={k} value={k}>{k}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </>
+          )}
+          {state.mode === 'rename' && (
+            <div>
+              <Label>Название</Label>
+              <Input value={label} onChange={(e) => setLabel(e.target.value)} autoFocus />
+            </div>
+          )}
+          {state.mode === 'changeType' && (
+            <>
+              <div className="text-xs text-[#7f8c8d]">Колонка: <b>{label}</b></div>
+              <div>
+                <Label>Тип</Label>
+                <Select value={type} onValueChange={setType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {COLUMN_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              {type === 'select' && (
+                <div>
+                  <Label>Справочник</Label>
+                  <Select value={options} onValueChange={setOptions}>
+                    <SelectTrigger><SelectValue placeholder="(выберите)" /></SelectTrigger>
+                    <SelectContent>
+                      {Object.keys(allOptions).map((k) => <SelectItem key={k} value={k}>{k}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Отмена</Button>
+          <Button onClick={() => onSave({ key: state.mode === 'create' ? key : undefined, label, type, options: type === 'select' ? options : null })}>
+            Сохранить
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ============================
+// DealCell — inline editing by type
+// ============================
 interface DealCellProps {
   deal: Deal
   col: DealColumn
@@ -514,7 +951,6 @@ function DealCell({ deal, col, options, hasLink, onEdit, onAddOption, onOpenLink
     onEdit(draft)
   }
 
-  // TI cell with link — special behaviour
   const isTiWithLink = col.key === 'ti' && hasLink
 
   if (col.type === 'select') {
@@ -574,40 +1010,49 @@ function DealCell({ deal, col, options, hasLink, onEdit, onAddOption, onOpenLink
     )
   }
 
-  // text
+  // text — with TI special handling
   return (
-    <td
-      className={`border border-[#e0e0e0] px-2 py-1 crm-editable cursor-text ${isTiWithLink ? 'crm-cell-ti-link' : ''}`}
-      onClick={() => {
-        if (isTiWithLink) {
-          onOpenLinkMenu()
-          return
-        }
-        if (!editing) startEdit()
-      }}
-      onContextMenu={(e) => {
-        if (isTiWithLink) {
-          e.preventDefault()
-          onOpenLinkMenu()
-        }
-      }}
-    >
-      {editing ? (
-        <input
-          autoFocus
-          type="text"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commit}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') commit()
-            if (e.key === 'Escape') setEditing(false)
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <td
+          className={`border border-[#e0e0e0] px-2 py-1 crm-editable cursor-text ${isTiWithLink ? 'crm-cell-ti-link' : ''}`}
+          onClick={() => {
+            if (isTiWithLink) {
+              onOpenLinkMenu()
+              return
+            }
+            if (!editing) startEdit()
           }}
-          className="w-full h-6 px-1 text-xs border border-[#2a5298] rounded focus:outline-none"
-        />
-      ) : (
-        <span className="text-xs">{String(rawValue ?? '') || '—'}</span>
+          onContextMenu={(e) => {
+            if (isTiWithLink) e.preventDefault() // let our menu open
+          }}
+        >
+          {editing ? (
+            <input
+              autoFocus
+              type="text"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={commit}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commit()
+                if (e.key === 'Escape') setEditing(false)
+              }}
+              className="w-full h-6 px-1 text-xs border border-[#2a5298] rounded focus:outline-none"
+            />
+          ) : (
+            <span className="text-xs">{String(rawValue ?? '') || '—'}</span>
+          )}
+        </td>
+      </ContextMenuTrigger>
+      {isTiWithLink && (
+        <ContextMenuContent>
+          <ContextMenuItem onClick={onOpenLinkMenu}>🔗 Внести/редактировать ссылку</ContextMenuItem>
+          <ContextMenuItem onClick={onOpenLink}>🌐 Открыть ссылку</ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem className="text-[#dc3545]" onClick={onRemoveLink}>🗑️ Удалить ссылку</ContextMenuItem>
+        </ContextMenuContent>
       )}
-    </td>
+    </ContextMenu>
   )
 }

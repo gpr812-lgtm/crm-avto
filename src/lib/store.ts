@@ -32,6 +32,11 @@ interface CrmState {
   columns: DealColumn[]
   loadColumns: () => Promise<void>
   saveColumn: (id: number, updates: Partial<DealColumn>) => Promise<void>
+  addColumn: (data: { key: string; label: string; type?: string; options?: string | null; default?: string; width?: number; insertAfter?: string }) => Promise<void>
+  removeColumn: (id: number) => Promise<void>
+
+  // Import deals
+  importDeals: (rows: Record<string, unknown>[], mode?: 'append' | 'replace') => Promise<number>
 
   // Options
   options: Record<string, string[]>
@@ -167,10 +172,29 @@ export const useCrmStore = create<CrmState>((set, get) => ({
     set((s) => ({
       columns: s.columns.map((c) => (c.id === id ? { ...c, ...updates } : c)),
     }))
-    const { column } = await api.updateColumn(id, updates)
+    const { column } = await api.updateColumnById(id, updates)
     set((s) => ({
       columns: s.columns.map((c) => (c.id === id ? column : c)),
     }))
+  },
+  addColumn: async (data) => {
+    const { column } = await api.createColumn(data)
+    set((s) => ({ columns: [...s.columns, column].sort((a, b) => a.order - b.order) }))
+    get().loadHistory()
+  },
+  removeColumn: async (id) => {
+    set((s) => ({ columns: s.columns.filter((c) => c.id !== id) }))
+    await api.deleteColumn(id)
+    get().loadHistory()
+  },
+
+  // ============ Import deals ============
+  importDeals: async (rows, mode = 'append') => {
+    const { imported } = await api.importDeals(rows, mode)
+    await get().loadDeals()
+    get().loadStats()
+    get().loadHistory()
+    return imported
   },
 
   // ============ Options ============

@@ -87,6 +87,13 @@ export const api = {
       body: JSON.stringify({ action, ids }),
     })),
 
+  importDeals: (deals: Record<string, unknown>[], mode: 'append' | 'replace' = 'append') =>
+    handle<{ ok: boolean; imported: number }>(fetch('/api/deals/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deals, mode }),
+    })),
+
   // ============================
   // Select Options
   // ============================
@@ -111,12 +118,29 @@ export const api = {
   listColumns: () =>
     handle<{ columns: DealColumn[] }>(fetch('/api/columns')),
 
+  createColumn: (data: { key: string; label: string; type?: string; options?: string | null; default?: string; width?: number; insertAfter?: string }) =>
+    handle<{ column: DealColumn }>(fetch('/api/columns', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })),
+
   updateColumn: (id: number, updates: Partial<DealColumn>) =>
     handle<{ column: DealColumn }>(fetch('/api/columns', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, ...updates }),
     })),
+
+  updateColumnById: (id: number, updates: Partial<DealColumn>) =>
+    handle<{ column: DealColumn }>(fetch(`/api/columns/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    })),
+
+  deleteColumn: (id: number) =>
+    handle<{ ok: boolean }>(fetch(`/api/columns/${id}`, { method: 'DELETE' })),
 
   // ============================
   // Channels

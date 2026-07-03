@@ -107,3 +107,136 @@ export function paginate<T>(arr: T[], page: number, pageSize: number): { data: T
   const start = (safePage - 1) * pageSize
   return { data: arr.slice(start, start + pageSize), total, pages }
 }
+
+/**
+ * Get weeks of month — array of {start, end, days: number[]} (Mon-Sun, 1-based days)
+ */
+export function getWeeksOfMonth(year: number, month1Based: number): { days: number[] }[] {
+  const dim = daysInMonth(year, month1Based)
+  const firstDay = new Date(year, month1Based - 1, 1)
+  // Convert Sunday (0) to 6, Monday (1) to 0
+  const firstDayIdx = (firstDay.getDay() + 6) % 7
+
+  const weeks: { days: number[] }[] = []
+  let currentWeek: number[] = []
+  // Pad start with nulls (use 0 to indicate "no day")
+  for (let i = 0; i < firstDayIdx; i++) currentWeek.push(0)
+  for (let day = 1; day <= dim; day++) {
+    currentWeek.push(day)
+    if (currentWeek.length === 7) {
+      weeks.push({ days: currentWeek })
+      currentWeek = []
+    }
+  }
+  if (currentWeek.length > 0) {
+    while (currentWeek.length < 7) currentWeek.push(0)
+    weeks.push({ days: currentWeek })
+  }
+  return weeks
+}
+
+/**
+ * Highlight matched text — returns array of {text, isMatch} chunks for safe rendering.
+ */
+export function highlightMatch(text: string, query: string): { text: string; isMatch: boolean }[] {
+  if (!query) return [{ text, isMatch: false }]
+  const lowerText = text.toLowerCase()
+  const lowerQuery = query.toLowerCase()
+  const chunks: { text: string; isMatch: boolean }[] = []
+  let idx = 0
+  while (idx < text.length) {
+    const found = lowerText.indexOf(lowerQuery, idx)
+    if (found === -1) {
+      chunks.push({ text: text.slice(idx), isMatch: false })
+      break
+    }
+    if (found > idx) {
+      chunks.push({ text: text.slice(idx, found), isMatch: false })
+    }
+    chunks.push({ text: text.slice(found, found + query.length), isMatch: true })
+    idx = found + query.length
+  }
+  return chunks
+}
+
+/**
+ * Calculate forecast for the current month.
+ * Returns: { contractsSoFar, forecastTotal, planTotal, trendPct, daysPassed, daysInMonth, isCurrentMonth }
+ */
+export function calculateForecast(
+  deals: { status: string; dateDkp: string | null; traffic?: string }[],
+  monthKey: string,
+  todayPlans: Record<number, { meetings: number; contracts: number }>,
+  prevMonthKey: string,
+  prevMonthDeals: { status: string; dateDkp: string | null }[],
+): {
+  contractsSoFar: number
+  forecastTotal: number
+  planTotal: number
+  trendPct: number | null
+  daysPassed: number
+  daysInMonth: number
+  isCurrentMonth: boolean
+  dailyAverage: number
+} {
+  const [y, m] = monthKey.split('-').map(Number)
+  const dim = daysInMonth(y, m)
+  const now = new Date()
+  const isCurrentMonth = now.getFullYear() === y && now.getMonth() + 1 === m
+
+  // All sold contracts in this month
+  const monthContracts = deals.filter(
+    (d) => d.status === 'Продан' && d.dateDkp && d.dateDkp.startsWith(monthKey),
+  )
+  const daysPassed = isCurrentMonth ? now.getDate() : dim
+  const contractsSoFar = monthContracts.filter((d) => {
+    if (!d.dateDkp) return false
+    const day = Number(d.dateDkp.slice(8, 10))
+    return day <= daysPassed
+  }).length
+
+  const dailyAverage = daysPassed > 0 ? contractsSoFar / daysPassed : 0
+  const forecastTotal = Math.round(dailyAverage * dim)
+
+  const planTotal = Object.values(todayPlans).reduce((s, p) => s + (p.contracts || 0), 0)
+
+  const prevContracts = prevMonthDeals.filter(
+    (d) => d.status === 'Продан' && d.dateDkp && d.dateDkp.startsWith(prevMonthKey),
+  ).length
+  const trendPct = prevContracts > 0 ? (contractsSoFar / prevContracts - 1) * 100 : null
+
+  return {
+    contractsSoFar,
+    forecastTotal,
+    planTotal,
+    trendPct,
+    daysPassed,
+    daysInMonth: dim,
+    isCurrentMonth,
+    dailyAverage,
+  }
+}
+
+/**
+ * Group deals by date for fast lookup.
+ */
+export function getContractsByDate(
+  deals: { status: string; dateDkp: string | null; traffic?: string }[],
+  monthKey: string,
+): Record<number, { calls: number; visits: number; all: number }> {
+  const out: Record<number, { calls: number; visits: number; all: number }> = {}
+  for (const d of deals) {
+    if (d.status !== 'Продан' || !d.dateDkp || !d.dateDkp.startsWith(monthKey)) continue
+    const day = Number(d.dateDkp.slice(8, 10))
+    if (!out[day]) out[day] = { calls: 0, visits: 0, all: 0 }
+    const traffic = d.traffic || ''
+    if (traffic.includes('Звонок') || traffic.includes('Заявка')) {
+      out[day].calls++
+    }
+    if (traffic.includes('Визит')) {
+      out[day].visits++
+    }
+    out[day].all++
+  }
+  return out
+}

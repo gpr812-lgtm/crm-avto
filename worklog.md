@@ -75,3 +75,26 @@ Stage Summary:
 - Все 57 проблем аудита исправлены
 - Готов к деплою на Vercel с PostgreSQL (инструкции в /home/z/my-project/README.md)
 - Скриншоты работы: /home/z/my-project/download/crm-screenshot-*.png
+
+---
+Task ID: build-2
+Agent: main (Super Z)
+Task: Добавить недостающий функционал из исходного HTML CRM
+
+Work Log:
+- Сравнил оригинальный HTML с текущей реализацией — выявлено 16 недостающих функций
+- Добавлены утилиты в utils-crm.ts: getWeeksOfMonth, highlightMatch, calculateForecast, getContractsByDate
+- Создан API /api/deals/import для импорта CSV (mode: append/replace)
+- Расширен API /api/columns: POST для создания с insertAfter, /api/columns/[id] PATCH/DELETE
+- Обновлён Zustand store: addColumn, removeColumn, importDeals
+- Полностью переписан traffic-tab.tsx: добавлены блок прогноза контрактов (5 KPI карточек), строки контрактов (Зв+Заявки, Визиты), таблица Общего банка контрактов (3-я таблица с % выполнения), недельные сводки (2 карточки), подсветка сегодняшнего дня
+- Полностью переписан sklad-tab.tsx: импорт CSV (с парсингом quoted-значений и сопоставлением по заголовкам/ключам), контекстное меню заголовков (rename/changeType/insertLeft/insertRight/delete), resize колонок через drag, динамическое добавление значений в select, отдельное контекстное меню для ТИ-ячеек (ссылка), вставка строк выше/ниже, массовое удаление по фильтрам (модалка со status/model/dateFrom/dateTo)
+- Обновлён page.tsx: глобальный поиск с дропдауном результатов + подсветка совпадений, модалка горячих клавиш (? или кнопка), кнопка бэкапа, escape для закрытия поиска
+- ESLint: 0 ошибок, 0 предупреждений
+- Проверено через Agent Browser: все вкладки работают, поиск с дропдауном, модалки, прогноз в Трафике
+
+Stage Summary:
+- Добавлено 16 функций из оригинала, перенёсших CRM ближе к исходному функционалу
+- 3 новых API endpoints (deals/import, columns POST, columns/[id] PATCH+DELETE)
+- 4 новых утилиты (forecast, weeks, highlight, contractsByDate)
+- Скриншоты: /home/z/my-project/download/crm-v2-*.png
