@@ -218,13 +218,12 @@ export function PlanFactTab() {
         </Button>
       </div>
 
-      {/* Plan/Fact table — compact, fits 1280px+ */}
-      <div className="flex-1 overflow-auto crm-scroll p-2">
-        <div className="bg-white rounded-lg border border-[hsl(220,16%,90%)] overflow-hidden crm-card-shadow">
-          <div className="crm-header-gradient text-white px-3 py-1.5 text-xs font-semibold">
-            📋 План/Факт — {['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][month - 1]} {year}
-          </div>
-          <div className="overflow-x-auto crm-scroll">
+      {/* Plan/Fact table — full width, edge to edge */}
+      <div className="flex-1 overflow-auto crm-scroll">
+        <div className="crm-header-gradient text-white px-3 py-1.5 text-xs font-semibold sticky top-0 z-20">
+          📋 План/Факт — {['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][month - 1]} {year}
+        </div>
+        <div className="overflow-x-auto crm-scroll">
             <table className="text-[10px] border-collapse crm-table w-full" style={{ tableLayout: 'fixed' }}>
               <colgroup>
                 <col style={{ width: '140px' }} />
@@ -342,10 +341,9 @@ export function PlanFactTab() {
               </tbody>
             </table>
           </div>
-        </div>
 
         {/* Formula legend */}
-        <div className="mt-2 bg-[hsl(220,20%,98%)] border border-[hsl(220,16%,90%)] rounded p-2 text-[10px] text-[hsl(215,16%,47%)] flex items-center gap-3 flex-wrap">
+        <div className="bg-[hsl(220,20%,98%)] border-t border-[hsl(220,16%,90%)] px-3 py-1.5 text-[10px] text-[hsl(215,16%,47%)] flex items-center gap-3 flex-wrap">
           <span className="font-semibold text-[hsl(215,28%,22%)]">📐 Формулы (по Excel):</span>
           <span><code className="bg-white px-1 rounded">CPL (план) = Бюджет / РЛ</code></span>
           <span><code className="bg-white px-1 rounded">ΣЛ = SUM(дней)</code></span>

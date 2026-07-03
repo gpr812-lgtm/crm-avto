@@ -291,3 +291,30 @@ Stage Summary:
 - Настройки каналов: полный CRUD с inline-редактированием всех полей
 - Изменения в настройках мгновенно применяются в таблице
 - Скриншоты: /home/z/my-project/download/v5-*.png
+
+---
+Task ID: planfact-edge-to-edge
+Agent: main (Super Z)
+Task: Убрать пустое место справа в План/Факт — таблица во всю ширину
+
+Work Log:
+- Проблема: контейнер had p-2 padding + карточка с rounded-lg border — создавали визуальные отступы по 8px + border
+- Решение: убрал p-2 padding и карточку-обёртку (bg-white rounded-lg border overflow-hidden crm-card-shadow)
+- Заголовок "📋 План/Факт — Месяц Год" теперь sticky top-0 z-20 (прилипает при скролле)
+- Легенда формул: убрал mt-2 + rounded + border, заменил на border-t (просто разделитель сверху)
+- Структура: scroll container → header (sticky) → table (w-full + table-layout:fixed + colgroup) → legend
+
+- Проверено на разных мониторах:
+  * 2560px (2K): table=2560px, fills=true ✅
+  * 1920px (Full HD): table=1920px, left=0, right=1920 ✅
+  * 1366px (ноутбук): table=1366px, no horizontal scroll ✅
+  * 1024px (планшет): table=1024px, no scroll ✅
+
+- Таблица от края до края (edge-to-edge) на любом разрешении
+- ESLint: 0 ошибок
+- Браузерные ошибки: 0
+
+Stage Summary:
+- Таблица План/Факт занимает 100% ширины viewport на любом мониторе (1024px - 2560px+)
+- Нет отступов, padding, border вокруг таблицы — идёт от самого левого до самого правого пикселя
+- Заголовок секции прилипает при вертикальном скролле (sticky top-0)
