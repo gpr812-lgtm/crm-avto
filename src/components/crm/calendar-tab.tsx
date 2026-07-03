@@ -107,19 +107,21 @@ export function CalendarTab() {
   return (
     <div className="h-full overflow-auto crm-scroll p-3 space-y-3">
       {/* Toolbar */}
-      <Card className="p-3 flex items-center gap-3 flex-wrap text-xs">
-        <div className="flex items-center gap-2">
+      <Card className="p-3 flex items-center gap-3 flex-nowrap text-xs overflow-x-auto crm-scroll">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <Button size="sm" variant="ghost" onClick={prevMonth} className="h-7 w-7 p-0"><ChevronLeft className="w-4 h-4" /></Button>
-          <span className="font-semibold min-w-40 text-center text-sm">
+          <span className="font-semibold min-w-40 text-center text-sm whitespace-nowrap">
             {['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][month - 1]} {year}
           </span>
           <Button size="sm" variant="ghost" onClick={nextMonth} className="h-7 w-7 p-0"><ChevronRight className="w-4 h-4" /></Button>
         </div>
-        <div className="flex-1" />
-        <Badge variant="outline">📅 План встреч: {totals.meetings}</Badge>
-        <Badge variant="outline">📋 План контрактов: {totals.contracts}</Badge>
-        <Badge className="bg-[#28a745] hover:bg-[#28a745]">📄 Факт контрактов: {totals.factContracts}</Badge>
-        <Badge className="bg-[#1a73e8] hover:bg-[#1a73e8]">📤 Факт выдач: {totals.factIssued}</Badge>
+        <div className="w-px h-6 bg-[hsl(220,16%,90%)] flex-shrink-0" />
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <Badge variant="outline" className="whitespace-nowrap bg-[hsl(220,20%,95%)]">📅 План встреч: {totals.meetings}</Badge>
+          <Badge variant="outline" className="whitespace-nowrap bg-[hsl(220,20%,95%)]">📋 План контрактов: {totals.contracts}</Badge>
+          <Badge className="bg-[hsl(142,60%,35%)] hover:bg-[hsl(142,60%,35%)] whitespace-nowrap">📄 Факт контрактов: {totals.factContracts}</Badge>
+          <Badge className="bg-[hsl(217,91%,45%)] hover:bg-[hsl(217,91%,45%)] whitespace-nowrap">📤 Факт выдач: {totals.factIssued}</Badge>
+        </div>
       </Card>
 
       {/* Calendar grid */}

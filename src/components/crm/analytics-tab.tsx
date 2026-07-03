@@ -6,7 +6,8 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { formatNumber } from '@/lib/utils-crm'
+import { formatNumber, monthKey } from '@/lib/utils-crm'
+import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react'
 import type { Deal } from '@/lib/types'
 
 interface FilterState {
@@ -22,14 +23,34 @@ const EMPTY_FILTERS: FilterState = {
   status: '', model: '', traffic: '', risk: '', kr: '', ti: '',
 }
 
+const MONTH_NAMES = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
+
 export function AnalyticsTab() {
   const { deals, options } = useCrmStore()
   const [groupBy, setGroupBy] = useState<'seller' | 'model'>('seller')
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS)
 
+  // Month filter — based on dateDkp
+  const today = new Date()
+  const [year, setYear] = useState(today.getFullYear())
+  const [month, setMonth] = useState(today.getMonth() + 1) // 1-12, 0 = "all months"
+  const [monthEnabled, setMonthEnabled] = useState(false)
+
+  const prevMonth = () => {
+    if (month === 1) { setYear(year - 1); setMonth(12) } else setMonth(month - 1)
+  }
+  const nextMonth = () => {
+    if (month === 12) { setYear(year + 1); setMonth(1) } else setMonth(month + 1)
+  }
+
+  const mk = monthKey(year, month)
+
   // Apply filters
   const filteredDeals = useMemo(() => {
     return deals.filter((d) => {
+      // Month filter — uses dateDkp
+      if (monthEnabled && d.dateDkp && !d.dateDkp.startsWith(mk)) return false
+      if (monthEnabled && !d.dateDkp) return false
       if (filters.status && d.status !== filters.status) return false
       if (filters.model && d.model !== filters.model) return false
       if (filters.traffic && d.traffic !== filters.traffic) return false
@@ -38,7 +59,7 @@ export function AnalyticsTab() {
       if (filters.ti && d.ti !== filters.ti) return false
       return true
     })
-  }, [deals, filters])
+  }, [deals, filters, monthEnabled, mk])
 
   // Group + aggregate
   const groups = useMemo(() => {
@@ -90,13 +111,41 @@ export function AnalyticsTab() {
       <Card className="p-3">
         <div className="flex items-center gap-3 flex-wrap text-xs">
           <div className="font-semibold">Фильтры:</div>
+
+          {/* Month filter with toggle */}
+          <div className={`flex items-center gap-1 px-2 py-0.5 border rounded transition-colors ${monthEnabled ? 'border-[hsl(221,60%,38%)] bg-[hsl(217,91%,95%)]' : 'border-[hsl(220,16%,90%)] bg-[hsl(220,20%,98%)]'}`}>
+            <button
+              onClick={() => setMonthEnabled(!monthEnabled)}
+              className={`flex items-center gap-1 ${monthEnabled ? 'text-[hsl(221,60%,38%)] font-semibold' : 'text-[hsl(215,16%,47%)]'}`}
+              title={monthEnabled ? 'Месяц включён — клик для выключения' : 'Клик для фильтрации по месяцу'}
+            >
+              <Calendar className="w-3 h-3" />
+              <span className="text-[10px]">Месяц:</span>
+            </button>
+            {monthEnabled ? (
+              <>
+                <Button size="sm" variant="ghost" onClick={prevMonth} className="h-5 w-5 p-0">
+                  <ChevronLeft className="w-3 h-3" />
+                </Button>
+                <span className="text-[10px] whitespace-nowrap font-medium">
+                  {MONTH_NAMES[month - 1]} {year}
+                </span>
+                <Button size="sm" variant="ghost" onClick={nextMonth} className="h-5 w-5 p-0">
+                  <ChevronRight className="w-3 h-3" />
+                </Button>
+              </>
+            ) : (
+              <span className="text-[10px] text-[hsl(215,16%,47%)]">все</span>
+            )}
+          </div>
+
           <FilterSelect label="Статус" value={filters.status} onChange={(v) => setFilter('status', v)} options={options.status ?? []} />
           <FilterSelect label="Модель" value={filters.model} onChange={(v) => setFilter('model', v)} options={options.model ?? []} />
           <FilterSelect label="Трафик" value={filters.traffic} onChange={(v) => setFilter('traffic', v)} options={options.traffic ?? []} />
           <FilterSelect label="РИСК" value={filters.risk} onChange={(v) => setFilter('risk', v)} options={options.risk ?? []} />
           <FilterSelect label="КР" value={filters.kr} onChange={(v) => setFilter('kr', v)} options={options.kr ?? []} />
           <FilterSelect label="ТИ" value={filters.ti} onChange={(v) => setFilter('ti', v)} options={options.ti ?? []} />
-          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setFilters(EMPTY_FILTERS)}>Сбросить</Button>
+          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setFilters(EMPTY_FILTERS); setMonthEnabled(false) }}>Сбросить</Button>
 
           <div className="flex-1" />
           <div className="font-semibold">Группировка:</div>
@@ -108,6 +157,11 @@ export function AnalyticsTab() {
             </SelectContent>
           </Select>
         </div>
+        {monthEnabled && (
+          <div className="mt-2 text-[10px] text-[hsl(215,16%,47%)]">
+            📅 Фильтр активен: показаны сделки с датой ДКП в {MONTH_NAMES[month - 1]} {year}
+          </div>
+        )}
       </Card>
 
       {/* KPI cards */}

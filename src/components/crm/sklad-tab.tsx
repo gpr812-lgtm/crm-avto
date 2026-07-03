@@ -33,7 +33,7 @@ import {
 } from '@/components/ui/select'
 import {
   Plus, Download, Upload, Trash2, Copy, ArrowUp, ArrowDown, Link as LinkIcon,
-  ExternalLink, Filter, Printer, ChevronUp, ChevronDown, FileSpreadsheet, X,
+  ExternalLink, Filter, Printer, ChevronUp, ChevronDown, FileSpreadsheet, X, Settings, Calendar,
 } from 'lucide-react'
 import { formatNumber, parseRuNumber, highlightMatch } from '@/lib/utils-crm'
 import { toast } from 'sonner'
@@ -78,9 +78,12 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
     addColumn,
     removeColumn,
     importDeals,
+    options: allOptions,
   } = useCrmStore()
 
   const [filters, setFilters] = useState<FilterState>({})
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [sortKey, setSortKey] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<SortDir>(null)
   const [linkDialog, setLinkDialog] = useState<{ dealId: string; currentUrl?: string } | null>(null)
@@ -88,6 +91,7 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [columnDialog, setColumnDialog] = useState<{ mode: 'create' | 'rename' | 'changeType'; col?: DealColumn; insertAfter?: string } | null>(null)
   const [importOpen, setImportOpen] = useState(false)
+  const [listsSettingsOpen, setListsSettingsOpen] = useState(false)
 
   const importFileRef = useRef<HTMLInputElement>(null)
   const csvFileRef = useRef<HTMLInputElement>(null)
@@ -105,6 +109,19 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
         result = result.filter((d) => String((d as Record<string, unknown>)[key] ?? '') === value)
       }
     }
+    // Date DKP range filter
+    if (dateFrom) {
+      result = result.filter((d) => {
+        const v = (d as Record<string, unknown>).dateDkp as string | null
+        return v && v >= dateFrom
+      })
+    }
+    if (dateTo) {
+      result = result.filter((d) => {
+        const v = (d as Record<string, unknown>).dateDkp as string | null
+        return v && v <= dateTo
+      })
+    }
     if (sortKey && sortDir) {
       result.sort((a, b) => {
         const av = (a as Record<string, unknown>)[sortKey]
@@ -120,7 +137,7 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
       })
     }
     return result
-  }, [deals, filters, sortKey, sortDir])
+  }, [deals, filters, dateFrom, dateTo, sortKey, sortDir])
 
   // Totals for number columns
   const totals = useMemo(() => {
@@ -446,7 +463,7 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
             key={col.key}
             value={filters[col.key] ?? ''}
             onChange={(e) => setFilters((f) => ({ ...f, [col.key]: e.target.value }))}
-            className="h-7 px-2 text-xs border border-[#ddd] rounded focus:outline-none focus:border-[#2a5298]"
+            className="h-7 px-2 text-xs border border-[hsl(220,16%,90%)] rounded focus:outline-none focus:border-[hsl(221,60%,38%)] bg-white"
           >
             <option value="">{col.label}: все</option>
             {(options[col.options ?? ''] ?? []).map((v) => (
@@ -454,11 +471,51 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
             ))}
           </select>
         ))}
+
+        {/* Date DKP range filter */}
+        <div className="flex items-center gap-1 px-2 py-0.5 border border-[hsl(220,16%,90%)] rounded bg-white">
+          <Calendar className="w-3 h-3 text-[hsl(215,16%,47%)]" />
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="h-6 text-[10px] bg-transparent border-0 focus:outline-none"
+            title="Дата ДКП с"
+          />
+          <span className="text-[hsl(215,16%,47%)] text-[10px]">—</span>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="h-6 text-[10px] bg-transparent border-0 focus:outline-none"
+            title="Дата ДКП по"
+          />
+          {(dateFrom || dateTo) && (
+            <button
+              onClick={() => { setDateFrom(''); setDateTo('') }}
+              className="text-[hsl(215,16%,47%)] hover:text-[hsl(0,72%,51%)]"
+              title="Сбросить даты"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+
         <Button size="sm" variant="ghost" className="h-7 text-xs"
-          onClick={() => setFilters({})}
-          disabled={Object.values(filters).every((v) => !v)}
+          onClick={() => { setFilters({}); setDateFrom(''); setDateTo('') }}
+          disabled={Object.values(filters).every((v) => !v) && !dateFrom && !dateTo}
         >
           Сбросить
+        </Button>
+
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 text-xs"
+          onClick={() => setListsSettingsOpen(true)}
+          title="Управление справочниками (модели, продавцы, статусы и т.д.)"
+        >
+          <Settings className="w-3 h-3 mr-1" /> Списки
         </Button>
 
         <div className="flex-1" />
@@ -742,6 +799,8 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
           setColumnDialog(null)
         }}
       />
+
+      <ListsSettingsDialog open={listsSettingsOpen} onOpenChange={setListsSettingsOpen} />
     </div>
   )
 }
@@ -1062,5 +1121,160 @@ function DealCell({ deal, col, options, hasLink, onEdit, onAddOption, onOpenLink
         </ContextMenuContent>
       )}
     </ContextMenu>
+  )
+}
+
+// ============================
+// Lists Settings Dialog — manage dropdown options (models, sellers, etc.)
+// ============================
+const DICT_LABELS: Record<string, string> = {
+  model: '🚗 Модели автомобилей',
+  status: '📊 Статусы сделок',
+  seller: '👤 Продавцы',
+  review: '⭐ Источники отзывов',
+  traffic: '🎯 Источники трафика',
+  risk: '⚠️ Уровни риска',
+  kr: '💳 КР (кредит)',
+  ti: '🔗 ТИ (ти_insurance)',
+}
+
+interface ListsSettingsDialogProps {
+  open: boolean
+  onOpenChange: (v: boolean) => void
+}
+
+function ListsSettingsDialog({ open, onOpenChange }: ListsSettingsDialogProps) {
+  const { options, addOption, loadOptions } = useCrmStore()
+  const [activeDict, setActiveDict] = useState<string>('model')
+  const [newValue, setNewValue] = useState('')
+
+  const handleAdd = async () => {
+    const v = newValue.trim()
+    if (!v) {
+      toast.warning('Введите значение')
+      return
+    }
+    if ((options[activeDict] ?? []).includes(v)) {
+      toast.warning('Такое значение уже есть')
+      return
+    }
+    await addOption(activeDict, v)
+    setNewValue('')
+    toast.success(`Добавлено: ${v}`)
+  }
+
+  const handleDelete = async (value: string) => {
+    if (!confirm(`Удалить значение "${value}" из справочника "${DICT_LABELS[activeDict] ?? activeDict}"?`)) return
+    const { api } = await import('@/lib/api')
+    await api.removeOption(activeDict, value)
+    await loadOptions()
+    toast.success('Удалено')
+  }
+
+  const handleRename = async (oldValue: string) => {
+    const newValue = prompt(`Переименовать "${oldValue}" на:`, oldValue)
+    if (!newValue || newValue === oldValue) return
+    const { api } = await import('@/lib/api')
+    await api.removeOption(activeDict, oldValue)
+    await addOption(activeDict, newValue.trim())
+    await loadOptions()
+    toast.success('Переименовано')
+  }
+
+  const dicts = Object.keys(DICT_LABELS)
+  const currentValues = options[activeDict] ?? []
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Settings className="w-4 h-4" />
+            Управление справочниками
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="flex gap-3 min-h-0 flex-1">
+          {/* Dict selector */}
+          <div className="w-56 flex-shrink-0 space-y-1 overflow-y-auto crm-scroll">
+            {dicts.map((d) => (
+              <button
+                key={d}
+                onClick={() => setActiveDict(d)}
+                className={`w-full text-left px-3 py-2 rounded text-xs transition-colors ${
+                  activeDict === d
+                    ? 'bg-[hsl(221,60%,38%)] text-white font-semibold'
+                    : 'bg-[hsl(220,20%,98%)] hover:bg-[hsl(220,20%,95%)] text-[hsl(215,28%,22%)]'
+                }`}
+              >
+                {DICT_LABELS[d]}
+                <span className={`block text-[10px] mt-0.5 ${activeDict === d ? 'text-white/70' : 'text-[hsl(215,16%,47%)]'}`}>
+                  {options[d]?.length ?? 0} значений
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* Values list */}
+          <div className="flex-1 flex flex-col min-h-0">
+            <div className="flex gap-2 mb-3">
+              <Input
+                value={newValue}
+                onChange={(e) => setNewValue(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleAdd() }}
+                placeholder={`Новое значение для «${DICT_LABELS[activeDict]}»...`}
+                className="h-8 text-xs"
+              />
+              <Button size="sm" onClick={handleAdd} className="h-8">
+                <Plus className="w-3.5 h-3.5 mr-1" /> Добавить
+              </Button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto crm-scroll border border-[hsl(220,16%,90%)] rounded">
+              {currentValues.length === 0 ? (
+                <div className="text-center py-8 text-xs text-[hsl(215,16%,47%)]">
+                  Справочник пуст. Добавьте первое значение выше.
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {currentValues.map((v, idx) => (
+                    <div key={v} className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-[hsl(220,23%,98%)] group">
+                      <span className="text-[hsl(215,16%,47%)] w-6 text-right">{idx + 1}.</span>
+                      <span className="flex-1">{v}</span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
+                        onClick={() => handleRename(v)}
+                        title="Переименовать"
+                      >
+                        ✏️
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 text-[hsl(0,72%,51%)]"
+                        onClick={() => handleDelete(v)}
+                        title="Удалить"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-2 text-[10px] text-[hsl(215,16%,47%)] flex items-center gap-1">
+              💡 Подсказка: новые значения сразу появятся в выпадающих списках Склада и формы сделки.
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Закрыть</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
