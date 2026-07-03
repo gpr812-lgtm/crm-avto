@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useCrmStore } from '@/lib/store'
-import { api, type TrafficResponse } from '@/lib/api'
+import { api, type TrafficResponse, type PlanFactResponse } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -11,7 +11,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
-import { Download, ChevronLeft, ChevronRight, TrendingUp, Calendar as CalIcon } from 'lucide-react'
+import { Download, ChevronLeft, ChevronRight, TrendingUp } from 'lucide-react'
 import {
   monthKey, daysInMonth, dayName, DAY_NAMES_MON_FIRST,
   getWeeksOfMonth, calculateForecast, getContractsByDate, formatNumber,
@@ -27,6 +27,8 @@ export function TrafficTab() {
   const [month, setMonth] = useState(today.getMonth() + 1)
 
   const [data, setData] = useState<TrafficResponse | null>(null)
+  const [planFactData, setPlanFactData] = useState<PlanFactResponse | null>(null)
+  const [skladFact, setSkladFact] = useState<{ contracts: number; issued: number } | null>(null)
   const [loading, setLoading] = useState(true)
   const [commentDialog, setCommentDialog] = useState<{ table: 'calls' | 'visits'; day: number; model: string; current?: string } | null>(null)
   const [commentDraft, setCommentDraft] = useState('')
@@ -36,9 +38,16 @@ export function TrafficTab() {
 
   useEffect(() => {
     let cancelled = false
-    Promise.all([api.getTraffic(mk), loadComments()]).then(([res]) => {
+    Promise.all([
+      api.getTraffic(mk),
+      loadComments(),
+      api.getPlanFact(mk),
+      api.getSkladMonthFact(mk),
+    ]).then(([res, _c, pf, sf]) => {
       if (!cancelled) {
         setData(res)
+        setPlanFactData(pf)
+        setSkladFact({ contracts: sf.contracts, issued: sf.issued })
         setLoading(false)
       }
     })
@@ -125,6 +134,33 @@ export function TrafficTab() {
   // Forecast (only for current month — shows different layout otherwise)
   const prevMk = month === 1 ? monthKey(year - 1, 12) : monthKey(year, month - 1)
   const forecast = calculateForecast(deals, mk, data?.plans ?? {}, prevMk, deals)
+
+  // New forecast metrics: Traffic + Contracts (План / Факт / Прогноз)
+  // План по трафику = sum of РЛ (plan) from Plan/Fact across all channels
+  const planTraffic = (() => {
+    if (!planFactData) return 0
+    let sum = 0
+    for (const ch of planFactData.channels) {
+      const p = planFactData.plan[ch.name]
+      if (p) sum += p.rl
+    }
+    return sum
+  })()
+  // Факт трафика = total calls + visits so far
+  const factTraffic = totalCalls + totalVisits
+  // Прогноз трафика = daily avg × days in month (only for current month)
+  const forecastTraffic = forecast.isCurrentMonth && forecast.daysPassed > 0
+    ? Math.round((factTraffic / forecast.daysPassed) * forecast.daysInMonth)
+    : factTraffic
+
+  // План по контрактам = from Plan/Fact summary table (planContracts)
+  const planContracts = planFactData?.fact?.planContracts ?? 0
+  // Факт контрактов = from Sklad (sold deals with dateDkp in month)
+  const factContracts = skladFact?.contracts ?? 0
+  // Прогноз контрактов = daily avg × days in month
+  const forecastContracts = forecast.isCurrentMonth
+    ? forecast.forecastTotal
+    : factContracts
 
   // Bank plan completion per day
   const bankByDay = Array.from({ length: dim + 1 }, (_, day) => {
@@ -215,34 +251,39 @@ export function TrafficTab() {
         </Button>
       </div>
 
-      {/* Forecast block (only for current month) */}
-      {forecast.isCurrentMonth && (
-        <div className="bg-gradient-to-br from-[#667eea] to-[#764ba2] text-white px-4 py-3 flex-shrink-0">
-          <div className="flex items-center gap-2 mb-2 text-sm font-semibold">
-            <TrendingUp className="w-4 h-4" />
-            Прогноз контрактов на {['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'][month - 1]}
+      {/* Forecast block — Traffic + Contracts (План / Факт / Прогноз) */}
+      <div className="bg-gradient-to-br from-[hsl(233,80%,55%)] to-[hsl(252,56%,42%)] text-white px-4 py-3 flex-shrink-0">
+        <div className="flex items-center gap-2 mb-3 text-sm font-semibold">
+          <TrendingUp className="w-4 h-4" />
+          План / Факт / Прогноз — {['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'][month - 1]} {year}
+        </div>
+        <div className="grid grid-cols-2 gap-4 text-xs">
+          {/* Traffic row */}
+          <div className="bg-white/10 rounded-lg p-2.5">
+            <div className="text-[10px] uppercase opacity-80 mb-1.5 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[hsl(168,76%,55%)]"></span>
+              📊 Трафик (звонки + визиты)
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <ForecastCard label="План" value={planTraffic} sub="из План/Факт" />
+              <ForecastCard label="Факт" value={factTraffic} sub={`за ${forecast.isCurrentMonth ? forecast.daysPassed : dim} дн.`} highlight />
+              <ForecastCard label="Прогноз" value={forecastTraffic} sub={forecast.isCurrentMonth ? `~${forecast.daysPassed > 0 ? (factTraffic / forecast.daysPassed).toFixed(1) : '0'}/день` : '—'} />
+            </div>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-xs">
-            <ForecastCard label="✅ Сделано" value={forecast.contractsSoFar} sub={`за ${forecast.daysPassed} дн.`} />
-            <ForecastCard label="🔮 Прогноз" value={forecast.forecastTotal} sub={`~${forecast.dailyAverage.toFixed(1)}/день`} highlight />
-            <ForecastCard label="📋 План" value={forecast.planTotal} sub={`вып. ${forecast.planTotal > 0 ? Math.round(forecast.contractsSoFar / forecast.planTotal * 100) : 0}%`} />
-            <ForecastCard
-              label="📈 Тренд"
-              value={forecast.trendPct === null ? '—' : `${forecast.trendPct > 0 ? '+' : ''}${forecast.trendPct.toFixed(0)}%`}
-              sub="к пред. мес."
-              color={forecast.trendPct === null ? 'white' : forecast.trendPct >= 0 ? '#9ae6b4' : '#fed7d7'}
-            />
-            <ForecastCard label="⏳ Осталось" value={Math.max(0, forecast.planTotal - forecast.contractsSoFar)} sub={`из плана`} />
+          {/* Contracts row */}
+          <div className="bg-white/10 rounded-lg p-2.5">
+            <div className="text-[10px] uppercase opacity-80 mb-1.5 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[hsl(142,60%,55%)]"></span>
+              📄 Контракты
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <ForecastCard label="План" value={planContracts} sub="из План/Факт" />
+              <ForecastCard label="Факт" value={factContracts} sub="из Склада" highlight />
+              <ForecastCard label="Прогноз" value={forecastContracts} sub={forecast.isCurrentMonth ? `~${forecast.dailyAverage.toFixed(1)}/день` : '—'} />
+            </div>
           </div>
         </div>
-      )}
-      {!forecast.isCurrentMonth && (
-        <div className="bg-[#e8f0fe] px-4 py-2 flex items-center gap-4 text-xs flex-shrink-0">
-          <CalIcon className="w-3.5 h-3.5 text-[#2a5298]" />
-          <span>Всего контрактов за месяц: <b>{totalAllContracts}</b></span>
-          <span>Среднее в день: <b>{dim > 0 ? (totalAllContracts / dim).toFixed(1) : 0}</b></span>
-        </div>
-      )}
+      </div>
 
       {/* Tables */}
       <div className="flex-1 overflow-auto crm-scroll p-2 space-y-3">
@@ -639,51 +680,66 @@ function WeeklySummary({
   weekTotals: number[]
   weekContracts: number[]
 }) {
+  const grandTotal = weekTotals.reduce((s, v) => s + v, 0)
+  const grandContracts = weekContracts.reduce((s, v) => s + v, 0)
+  const grandPct = grandTotal > 0 ? (grandContracts / grandTotal) * 100 : 0
+
   return (
-    <Card className="overflow-hidden">
-      <div className={`${gradient} text-white px-3 py-1.5 text-xs font-semibold`}>{title}</div>
-      <table className="w-full text-[11px] border-collapse crm-table">
-        <thead>
-          <tr className="bg-[#f1f3f4]">
-            <th className="border border-[#dadce0] px-2 py-1">Неделя</th>
-            <th className="border border-[#dadce0] px-2 py-1">Дни</th>
-            <th className="border border-[#dadce0] px-2 py-1">Всего</th>
-            <th className="border border-[#dadce0] px-2 py-1">Контракты</th>
-            <th className="border border-[#dadce0] px-2 py-1">% Конв.</th>
-          </tr>
-        </thead>
-        <tbody>
-          {weeks.map((w, idx) => {
-            const dayStr = w.days.filter((d) => d > 0).map((d) => d).join(', ')
-            const total = weekTotals[idx]
-            const contracts = weekContracts[idx]
-            const pct = total > 0 ? (contracts / total) * 100 : 0
-            return (
-              <tr key={idx} className="hover:bg-[#f8f9fa]">
-                <td className="border border-[#e0e0e0] px-2 py-1 text-center">{idx + 1}</td>
-                <td className="border border-[#e0e0e0] px-2 py-1 text-center text-[#7f8c8d]">{dayStr}</td>
-                <td className="border border-[#e0e0e0] px-2 py-1 text-center tabular-nums font-medium">{total}</td>
-                <td className="border border-[#e0e0e0] px-2 py-1 text-center tabular-nums text-[#28a745] font-medium">{contracts}</td>
-                <td className={`border border-[#e0e0e0] px-2 py-1 text-center tabular-nums ${pct >= 50 ? 'text-[#28a745]' : 'text-[#dc3545]'}`}>
-                  {total > 0 ? `${pct.toFixed(0)}%` : '—'}
-                </td>
-              </tr>
-            )
-          })}
-          <tr className="bg-[#e8f0fe] font-bold">
-            <td className="border border-[#dadce0] px-2 py-1 text-center" colSpan={2}>ИТОГО</td>
-            <td className="border border-[#dadce0] px-2 py-1 text-center tabular-nums">{weekTotals.reduce((s, v) => s + v, 0)}</td>
-            <td className="border border-[#dadce0] px-2 py-1 text-center tabular-nums">{weekContracts.reduce((s, v) => s + v, 0)}</td>
-            <td className="border border-[#dadce0] px-2 py-1 text-center tabular-nums">
-              {(() => {
-                const t = weekTotals.reduce((s, v) => s + v, 0)
-                const c = weekContracts.reduce((s, v) => s + v, 0)
-                return t > 0 ? `${(c / t * 100).toFixed(0)}%` : '—'
-              })()}
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <Card className="overflow-hidden crm-card-shadow">
+      <div className={`${gradient} text-white px-3 py-1.5 text-xs font-semibold flex items-center justify-between`}>
+        <span>{title}</span>
+        <span className="text-[10px] opacity-80">
+          Σ: <b className="tabular-nums">{grandTotal}</b> → <b className="tabular-nums">{grandContracts}</b> 📄 ({grandPct.toFixed(0)}%)
+        </span>
+      </div>
+      <div className="flex gap-1.5 p-2 overflow-x-auto crm-scroll">
+        {weeks.map((w, idx) => {
+          const days = w.days.filter((d) => d > 0)
+          const first = days[0] ?? 0
+          const last = days[days.length - 1] ?? 0
+          const total = weekTotals[idx]
+          const contracts = weekContracts[idx]
+          const pct = total > 0 ? (contracts / total) * 100 : 0
+          const hasData = total > 0
+
+          return (
+            <div
+              key={idx}
+              className={`flex-shrink-0 rounded-lg border px-2.5 py-1.5 text-center min-w-20 transition-all ${
+                hasData
+                  ? 'bg-[hsl(220,20%,98%)] border-[hsl(220,16%,90%)] hover:border-[hsl(221,60%,50%)] hover:shadow-sm'
+                  : 'bg-[hsl(220,20%,98%)] border-[hsl(220,16%,92%)] opacity-50'
+              }`}
+            >
+              <div className="text-[9px] text-[hsl(215,16%,47%)] uppercase font-medium">
+                Нед {idx + 1}
+              </div>
+              <div className="text-[9px] text-[hsl(215,16%,60%)] mb-1">
+                {first && last ? (first === last ? first : `${first}–${last}`) : '—'}
+              </div>
+              <div className="text-base font-bold tabular-nums leading-none" style={{ color: hasData ? 'hsl(221,60%,38%)' : 'hsl(215,16%,70%)' }}>
+                {total || '—'}
+              </div>
+              {hasData && (
+                <>
+                  <div className="text-[10px] text-[hsl(142,60%,35%)] tabular-nums mt-0.5">
+                    {contracts} 📄
+                  </div>
+                  <div
+                    className="text-[9px] tabular-nums font-medium mt-0.5 rounded px-1"
+                    style={{
+                      color: pct >= 50 ? 'hsl(142,60%,25%)' : pct >= 25 ? 'hsl(38,80%,30%)' : 'hsl(0,70%,40%)',
+                      backgroundColor: pct >= 50 ? 'hsl(142,60%,92%)' : pct >= 25 ? 'hsl(38,80%,92%)' : 'hsl(0,70%,94%)',
+                    }}
+                  >
+                    {pct.toFixed(0)}%
+                  </div>
+                </>
+              )}
+            </div>
+          )
+        })}
+      </div>
     </Card>
   )
 }

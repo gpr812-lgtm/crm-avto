@@ -88,7 +88,6 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
   const [sortDir, setSortDir] = useState<SortDir>(null)
   const [linkDialog, setLinkDialog] = useState<{ dealId: string; currentUrl?: string } | null>(null)
   const [linkInput, setLinkInput] = useState('')
-  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [columnDialog, setColumnDialog] = useState<{ mode: 'create' | 'rename' | 'changeType'; col?: DealColumn; insertAfter?: string } | null>(null)
   const [importOpen, setImportOpen] = useState(false)
   const [listsSettingsOpen, setListsSettingsOpen] = useState(false)
@@ -397,39 +396,6 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
     toast.success('Колонка удалена')
   }
 
-  // Bulk delete by filters
-  const [bulkDeleteFilters, setBulkDeleteFilters] = useState<{ status: string; model: string; dateFrom: string; dateTo: string }>({
-    status: '', model: '', dateFrom: '', dateTo: '',
-  })
-  const bulkDeleteCount = useMemo(() => {
-    return deals.filter((d) => {
-      if (bulkDeleteFilters.status && d.status !== bulkDeleteFilters.status) return false
-      if (bulkDeleteFilters.model && d.model !== bulkDeleteFilters.model) return false
-      if (bulkDeleteFilters.dateFrom && d.dateDkp && d.dateDkp < bulkDeleteFilters.dateFrom) return false
-      if (bulkDeleteFilters.dateTo && d.dateDkp && d.dateDkp > bulkDeleteFilters.dateTo) return false
-      return true
-    }).length
-  }, [deals, bulkDeleteFilters])
-
-  const handleBulkDeleteByFilters = async () => {
-    if (bulkDeleteCount === 0) {
-      toast.warning('Нет сделок под выбранные фильтры')
-      return
-    }
-    if (!confirm(`Удалить ${bulkDeleteCount} сделок по фильтрам?`)) return
-    const ids = deals.filter((d) => {
-      if (bulkDeleteFilters.status && d.status !== bulkDeleteFilters.status) return false
-      if (bulkDeleteFilters.model && d.model !== bulkDeleteFilters.model) return false
-      if (bulkDeleteFilters.dateFrom && d.dateDkp && d.dateDkp < bulkDeleteFilters.dateFrom) return false
-      if (bulkDeleteFilters.dateTo && d.dateDkp && d.dateDkp > bulkDeleteFilters.dateTo) return false
-      return true
-    }).map((d) => d.id)
-    await removeDealsBulk(ids)
-    setBulkDeleteOpen(false)
-    setBulkDeleteFilters({ status: '', model: '', dateFrom: '', dateTo: '' })
-    toast.success(`Удалено ${ids.length} сделок`)
-  }
-
   const handlePrint = () => window.print()
   const allSelected = filteredDeals.length > 0 && filteredDeals.every((d) => selectedDealIds.has(d.id))
 
@@ -548,10 +514,6 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
             </Button>
           </>
         )}
-
-        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setBulkDeleteOpen(true)}>
-          <Trash2 className="w-3 h-3 mr-1" /> По фильтрам
-        </Button>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -731,59 +693,6 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
       </Dialog>
 
       {/* Bulk delete by filters */}
-      <Dialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>🗑️ Массовое удаление по фильтрам</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <div>
-              <Label>Статус</Label>
-              <select
-                value={bulkDeleteFilters.status}
-                onChange={(e) => setBulkDeleteFilters((f) => ({ ...f, status: e.target.value }))}
-                className="w-full h-9 px-2 text-xs border border-[#ddd] rounded"
-              >
-                <option value="">Все</option>
-                {(options.status ?? []).map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div>
-              <Label>Модель</Label>
-              <select
-                value={bulkDeleteFilters.model}
-                onChange={(e) => setBulkDeleteFilters((f) => ({ ...f, model: e.target.value }))}
-                className="w-full h-9 px-2 text-xs border border-[#ddd] rounded"
-              >
-                <option value="">Все</option>
-                {(options.model ?? []).map((m) => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label>Дата ДКП с</Label>
-                <Input type="date" value={bulkDeleteFilters.dateFrom}
-                  onChange={(e) => setBulkDeleteFilters((f) => ({ ...f, dateFrom: e.target.value }))} />
-              </div>
-              <div>
-                <Label>Дата ДКП по</Label>
-                <Input type="date" value={bulkDeleteFilters.dateTo}
-                  onChange={(e) => setBulkDeleteFilters((f) => ({ ...f, dateTo: e.target.value }))} />
-              </div>
-            </div>
-            <div className="bg-[#fff3cd] border border-[#ffc107] rounded p-2 text-xs text-center">
-              Найдено сделок: <b className="text-[#dc3545]">{bulkDeleteCount}</b>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setBulkDeleteOpen(false)}>Отмена</Button>
-            <Button variant="destructive" onClick={handleBulkDeleteByFilters} disabled={bulkDeleteCount === 0}>
-              <Trash2 className="w-3.5 h-3.5 mr-1" /> Удалить {bulkDeleteCount || ''}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Column dialog (create / rename / changeType) */}
       <ColumnDialog
         state={columnDialog}

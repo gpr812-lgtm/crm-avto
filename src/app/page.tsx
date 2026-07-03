@@ -290,8 +290,8 @@ export default function HomePage() {
           <StatBadge label="Всего" value={stats.total} variant="neutral" />
           <StatBadge label="Продан" value={stats.sold} variant="success" />
           <StatBadge label="Склад" value={stats.inStock} variant="warning" />
+          <StatBadge label="Призраки" value={stats.ghost} variant="ghost" />
           <StatBadge label="Отказ" value={stats.refused} variant="danger" />
-          {stats.ghost > 0 && <StatBadge label="Призрак" value={stats.ghost} variant="ghost" />}
           <div className="w-px h-4 bg-[hsl(220,16%,90%)] mx-1" />
           <StatBadge label="Σ ЖОК" value={`${new Intl.NumberFormat('ru-RU').format(stats.sumJok)} ₽`} variant="info" />
           <StatBadge label="Σ К" value={`${new Intl.NumberFormat('ru-RU').format(stats.sumK)} ₽`} variant="info" />
