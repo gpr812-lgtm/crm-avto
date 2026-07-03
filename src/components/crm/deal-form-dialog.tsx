@@ -31,7 +31,7 @@ const EMPTY_FORM = {
   dateIssued: '',
   seller: '',
   client: '',
-  jok: 0,
+  // jok is computed = j + o + k, never stored in form state
   j: 0,
   o: 0,
   k: 0,
@@ -58,7 +58,7 @@ export function DealFormDialog({ open, onOpenChange, initialDeal }: DealFormDial
           dateIssued: initialDeal.dateIssued ?? '',
           seller: initialDeal.seller ?? '',
           client: initialDeal.client ?? '',
-          jok: initialDeal.jok ?? 0,
+          // jok is computed from j+o+k, not stored in form
           j: initialDeal.j ?? 0,
           o: initialDeal.o ?? 0,
           k: initialDeal.k ?? 0,
@@ -162,22 +162,33 @@ export function DealFormDialog({ open, onOpenChange, initialDeal }: DealFormDial
 
           {/* Right column */}
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label htmlFor="jok">ЖОК (₽)</Label>
-                <Input id="jok" type="number" value={form.jok} onChange={(e) => set('jok', Number(e.target.value) || 0)} />
-              </div>
-              <div>
-                <Label htmlFor="j">Ж (₽)</Label>
-                <Input id="j" type="number" value={form.j} onChange={(e) => set('j', Number(e.target.value) || 0)} />
-              </div>
-              <div>
-                <Label htmlFor="o">О (₽)</Label>
-                <Input id="o" type="number" value={form.o} onChange={(e) => set('o', Number(e.target.value) || 0)} />
-              </div>
-              <div>
-                <Label htmlFor="k">К (₽)</Label>
-                <Input id="k" type="number" value={form.k} onChange={(e) => set('k', Number(e.target.value) || 0)} />
+            {/* Ж, О, К — input fields; ЖОК — auto-computed read-only */}
+            <div>
+              <Label className="text-[10px] uppercase text-[hsl(215,16%,47%)]">Финансы (₽)</Label>
+              <div className="grid grid-cols-4 gap-2 mt-1">
+                <div>
+                  <Label htmlFor="j" className="text-[10px]">Ж</Label>
+                  <Input id="j" type="number" value={form.j} onChange={(e) => set('j', Number(e.target.value) || 0)} className="h-8 text-xs" />
+                </div>
+                <div>
+                  <Label htmlFor="o" className="text-[10px]">О</Label>
+                  <Input id="o" type="number" value={form.o} onChange={(e) => set('o', Number(e.target.value) || 0)} className="h-8 text-xs" />
+                </div>
+                <div>
+                  <Label htmlFor="k" className="text-[10px]">К</Label>
+                  <Input id="k" type="number" value={form.k} onChange={(e) => set('k', Number(e.target.value) || 0)} className="h-8 text-xs" />
+                </div>
+                <div>
+                  <Label htmlFor="jok" className="text-[10px] text-[hsl(221,60%,38%)] font-semibold">ЖОК = Ж+О+К</Label>
+                  <Input
+                    id="jok"
+                    type="text"
+                    value={new Intl.NumberFormat('ru-RU').format(form.j + form.o + form.k)}
+                    readOnly
+                    className="h-8 text-xs bg-[hsl(217,91%,95%)] border-[hsl(217,91%,80%)] text-[hsl(221,60%,30%)] font-bold cursor-not-allowed"
+                    title="ЖОК вычисляется автоматически как Ж + О + К"
+                  />
+                </div>
               </div>
             </div>
 

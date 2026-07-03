@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { addHistory } from '@/lib/utils-crm'
 
+/**
+ * Compute jok = j + o + k (ЖОК is always auto-calculated, never user-set)
+ */
+function computeJok(data: Record<string, unknown>): number {
+  const j = Number(data.j) || 0
+  const o = Number(data.o) || 0
+  const k = Number(data.k) || 0
+  return j + o + k
+}
+
 // GET /api/deals — list deals with optional filters
 export async function GET(req: NextRequest) {
   try {
@@ -43,10 +53,16 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
+    // Always compute jok from j + o + k (never trust client-provided jok)
+    const jok = computeJok(body)
     const maxOrder = await db.deal.aggregate({ _max: { order: true } })
+
+    // Strip jok from body to prevent override
+    const { jok: _ignoredJok, ...rest } = body
     const deal = await db.deal.create({
       data: {
-        ...body,
+        ...rest,
+        jok,
         order: (maxOrder._max.order ?? 0) + 1,
       },
     })

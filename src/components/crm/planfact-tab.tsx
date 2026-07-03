@@ -19,14 +19,14 @@ import type { Channel } from '@/lib/types'
 const GROUPS = ['Digital', 'Классифайды', 'Геосервисы и SERM', 'Direct', 'Offline', 'Обязательное', 'Прочее']
 
 // ============================
-// Formulas (matching Excel file)
+// Formulas (matching Excel file exactly)
 // ============================
-// CPL (план)       = Budget / RL            (if RL=0 → 0)
-// Total leads      = Σ days
-// CPL (факт)       = Budget / Total leads   (if Total leads=0 → 0)
-// Контракты (план) = round(RL × SR% / 100)  — прогноз, нет в Excel
-// Выдачи (план)    = round(TotalLeads × SR% / 100)
-// SR% (факт)       = Contracts_fact / Total leads × 100   (if 0 → 0)
+// Excel structure:
+//   ПЛАН:  Бюджет (input) | CPL = Бюджет/РЛ | РЛ (input) | SR% (input)
+//   Days:  1..31 (input leads per day)
+//   ФАКТ:  Бюджет (=plan) | CPL = Бюджет/ΣЛ | РЛ = SUM(days) | SR% = К.факт/ΣЛ | Контракты (input) | Выдачи (input)
+//
+// In Excel "РЛ" in fact section is actually Σ leads (sum of days, mislabeled)
 
 function calcPlanCPL(budget: number, rl: number): number {
   return rl > 0 ? budget / rl : 0
@@ -36,12 +36,6 @@ function calcTotalLeads(days: Record<number, number>): number {
 }
 function calcFactCPL(budget: number, totalLeads: number): number {
   return totalLeads > 0 ? budget / totalLeads : 0
-}
-function calcPlanContracts(rl: number, sr: number): number {
-  return Math.round((rl * sr) / 100)
-}
-function calcPlanIssued(totalLeads: number, sr: number): number {
-  return Math.round((totalLeads * sr) / 100)
 }
 function calcFactSR(contractsFact: number, totalLeads: number): number {
   return contractsFact > 0 && totalLeads > 0 ? (contractsFact / totalLeads) * 100 : 0
@@ -88,7 +82,6 @@ export function PlanFactTab() {
     return data?.plan[channelName] ?? { days: {}, budget: 0, cpl: 0, rl: 0, sr: 0 }
   }
 
-  // Update day leads
   const updateDay = async (channel: string, day: number, leads: number) => {
     setData((prev) => {
       if (!prev) return prev
@@ -105,7 +98,6 @@ export function PlanFactTab() {
     }
   }
 
-  // Update channel param (budget/cpl/rl/sr) — NOTE: cpl is now derived, but we keep it in storage for compatibility
   const updateParam = async (channel: string, field: 'budget' | 'cpl' | 'rl' | 'sr', value: number) => {
     setData((prev) => {
       if (!prev) return prev
@@ -122,7 +114,6 @@ export function PlanFactTab() {
     }
   }
 
-  // Save fact
   const saveFact = async () => {
     try {
       await api.updateFact(mk, { contracts: factContracts, issued: factIssued })
@@ -132,26 +123,25 @@ export function PlanFactTab() {
     }
   }
 
-  // Compute grand totals with proper formulas
+  // Compute grand totals — matches Excel column formulas
   const grandTotals = useMemo(() => {
-    let budget = 0, leads = 0, planContracts = 0, planIssued = 0
+    let budget = 0, totalLeads = 0
     for (const ch of channels) {
       const p = getPlan(ch.name)
       budget += p.budget
-      const tl = calcTotalLeads(p.days)
-      leads += tl
-      planContracts += calcPlanContracts(p.rl, p.sr)
-      planIssued += calcPlanIssued(tl, p.sr)
+      totalLeads += calcTotalLeads(p.days)
     }
-    const factSR = calcFactSR(factContracts, leads)
-    return { budget, leads, planContracts, planIssued, factContracts, factIssued, factSR }
+    const factCpl = calcFactCPL(budget, totalLeads)
+    const factSR = calcFactSR(factContracts, totalLeads)
+    return { budget, totalLeads, factCpl, factSR, factContracts, factIssued }
   }, [channels, data, factContracts, factIssued, getPlan])
 
   const exportExcel = () => {
     const headers = [
-      'Канал', 'Группа', 'Бюджет', 'CPL (план)', 'РЛ', 'SR%',
+      'Канал', 'Группа',
+      'Бюджет', 'CPL (план)', 'РЛ', 'SR%',
       ...Array.from({ length: dim }, (_, i) => String(i + 1)),
-      'Σ Лидов', 'CPL (факт)', 'Контр.(план)', 'Выдачи(план)',
+      'Бюджет', 'CPL (факт)', 'ΣЛ', 'SR% (факт)', 'Контракты (факт)', 'Выдачи (факт)',
     ]
     const rows: string[][] = [headers]
     for (const ch of channels) {
@@ -159,30 +149,14 @@ export function PlanFactTab() {
       const tl = calcTotalLeads(p.days)
       const planCpl = calcPlanCPL(p.budget, p.rl)
       const factCpl = calcFactCPL(p.budget, tl)
-      const pc = calcPlanContracts(p.rl, p.sr)
-      const pi = calcPlanIssued(tl, p.sr)
+      const factSr = calcFactSR(0, tl) // per-channel fact not tracked
       rows.push([
         ch.name, ch.group,
-        String(p.budget),
-        planCpl.toFixed(2),
-        String(p.rl),
-        String(p.sr),
+        String(p.budget), planCpl.toFixed(2), String(p.rl), String(p.sr),
         ...Array.from({ length: dim }, (_, i) => String(p.days[i + 1] ?? 0)),
-        String(tl),
-        factCpl.toFixed(2),
-        String(pc),
-        String(pi),
+        String(p.budget), factCpl.toFixed(2), String(tl), `${factSr.toFixed(1)}%`, '0', '0',
       ])
     }
-    rows.push([
-      'ИТОГО', '',
-      String(grandTotals.budget), '',
-      String(grandTotals.leads), '',
-      ...Array.from({ length: dim }, () => ''),
-      String(grandTotals.leads), '',
-      String(grandTotals.planContracts),
-      String(grandTotals.planIssued),
-    ])
     const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"></head><body><table border="1"><thead><tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.slice(1).map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></body></html>`
     const blob = new Blob([html], { type: 'application/vnd.ms-excel' })
     const url = URL.createObjectURL(blob)
@@ -211,12 +185,10 @@ export function PlanFactTab() {
 
         <div className="flex gap-2 flex-wrap">
           <Badge variant="outline" className="bg-[hsl(220,20%,95%)]">Бюджет: {formatNumber(grandTotals.budget)} ₽</Badge>
-          <Badge variant="outline" className="bg-[hsl(220,20%,95%)]">Лиды: {grandTotals.leads}</Badge>
-          <Badge className="bg-[hsl(142,60%,35%)] hover:bg-[hsl(142,60%,35%)]">Контр.(план): {grandTotals.planContracts}</Badge>
-          <Badge className="bg-[hsl(217,91%,45%)] hover:bg-[hsl(217,91%,45%)]">Выдачи(план): {grandTotals.planIssued}</Badge>
-          <Badge className="bg-[hsl(221,60%,38%)] hover:bg-[hsl(221,60%,38%)]">К.(факт): {grandTotals.factContracts}</Badge>
-          <Badge className="bg-[hsl(289,60%,55%)] hover:bg-[hsl(289,60%,55%)]">В.(факт): {grandTotals.factIssued}</Badge>
-          <Badge className="bg-[hsl(38,90%,40%)] hover:bg-[hsl(38,90%,40%)]">SR%(факт): {grandTotals.factSR.toFixed(1)}%</Badge>
+          <Badge variant="outline" className="bg-[hsl(220,20%,95%)]">ΣЛ: {grandTotals.totalLeads}</Badge>
+          <Badge className="bg-[hsl(142,60%,35%)] hover:bg-[hsl(142,60%,35%)]">К.факт: {grandTotals.factContracts}</Badge>
+          <Badge className="bg-[hsl(217,91%,45%)] hover:bg-[hsl(217,91%,45%)]">В.факт: {grandTotals.factIssued}</Badge>
+          <Badge className="bg-[hsl(38,90%,40%)] hover:bg-[hsl(38,90%,40%)]">SR%: {grandTotals.factSR.toFixed(1)}%</Badge>
         </div>
 
         <div className="flex-1" />
@@ -228,59 +200,68 @@ export function PlanFactTab() {
         </Button>
       </div>
 
-      {/* Plan/Fact table */}
+      {/* Plan/Fact table — compact, fits 1280px+ */}
       <div className="flex-1 overflow-auto crm-scroll p-2">
         <div className="bg-white rounded-lg border border-[hsl(220,16%,90%)] overflow-hidden crm-card-shadow">
           <div className="crm-header-gradient text-white px-3 py-1.5 text-xs font-semibold">
             📋 План/Факт — {['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][month - 1]} {year}
           </div>
           <div className="overflow-x-auto crm-scroll">
-            <table className="w-full text-[10px] border-collapse crm-table">
+            <table className="text-[10px] border-collapse crm-table" style={{ tableLayout: 'fixed' }}>
+              <colgroup>
+                <col style={{ width: '110px' }} />
+                <col style={{ width: '55px' }} />
+                <col style={{ width: '45px' }} />
+                <col style={{ width: '30px' }} />
+                <col style={{ width: '35px' }} />
+                {Array.from({ length: dim }, (_, i) => <col key={i} style={{ width: '22px' }} />)}
+                <col style={{ width: '40px' }} />
+                <col style={{ width: '40px' }} />
+                <col style={{ width: '30px' }} />
+                <col style={{ width: '35px' }} />
+                <col style={{ width: '38px' }} />
+                <col style={{ width: '38px' }} />
+              </colgroup>
               <thead>
                 <tr className="bg-[hsl(220,20%,96%)]">
-                  <th rowSpan={2} className="border border-[hsl(220,16%,90%)] px-2 py-1 sticky left-0 z-10 bg-[hsl(224,56%,25%)] text-white min-w-32">Канал</th>
-                  <th colSpan={4} className="border border-[hsl(220,16%,90%)] px-2 py-1 bg-[hsl(224,56%,25%)] text-white">ПЛАН</th>
-                  <th colSpan={dim} className="border border-[hsl(220,16%,90%)] px-2 py-1 bg-[hsl(221,60%,38%)] text-white">ПЛАН (по дням)</th>
-                  <th colSpan={4} className="border border-[hsl(220,16%,90%)] px-2 py-1 bg-[hsl(233,80%,45%)] text-white">НАРАСТАЮЩИМ</th>
-                  <th colSpan={3} className="border border-[hsl(220,16%,90%)] px-2 py-1 bg-[hsl(224,56%,25%)] text-white">ФАКТ</th>
+                  <th rowSpan={2} className="border border-[hsl(220,16%,90%)] px-1 py-1 sticky left-0 z-10 bg-[hsl(224,56%,25%)] text-white text-left">Канал</th>
+                  <th colSpan={4} className="border border-[hsl(220,16%,90%)] px-1 py-1 bg-[hsl(224,56%,25%)] text-white">ПЛАН</th>
+                  <th colSpan={dim} className="border border-[hsl(220,16%,90%)] px-1 py-1 bg-[hsl(221,60%,38%)] text-white">ПЛАН (по дням)</th>
+                  <th colSpan={6} className="border border-[hsl(220,16%,90%)] px-1 py-1 bg-[hsl(289,60%,45%)] text-white">ФАКТ</th>
                 </tr>
-                <tr className="bg-[hsl(220,20%,96%)]">
-                  <th className="border border-[hsl(220,16%,90%)] px-1 py-1 bg-[hsl(224,56%,25%)] text-white">Бюджет</th>
-                  <th className="border border-[hsl(220,16%,90%)] px-1 py-1 bg-[hsl(224,56%,25%)] text-white">CPL</th>
-                  <th className="border border-[hsl(220,16%,90%)] px-1 py-1 bg-[hsl(224,56%,25%)] text-white">РЛ</th>
-                  <th className="border border-[hsl(220,16%,90%)] px-1 py-1 bg-[hsl(224,56%,25%)] text-white">SR%</th>
+                <tr className="bg-[hsl(220,20%,96%)] text-[9px]">
+                  <th className="border border-[hsl(220,16%,90%)] px-0.5 py-1 bg-[hsl(224,56%,25%)] text-white">Бюдж</th>
+                  <th className="border border-[hsl(220,16%,90%)] px-0.5 py-1 bg-[hsl(224,56%,25%)] text-white">CPL</th>
+                  <th className="border border-[hsl(220,16%,90%)] px-0.5 py-1 bg-[hsl(224,56%,25%)] text-white">РЛ</th>
+                  <th className="border border-[hsl(220,16%,90%)] px-0.5 py-1 bg-[hsl(224,56%,25%)] text-white">SR%</th>
                   {Array.from({ length: dim }, (_, i) => {
                     const day = i + 1
                     const dn = dayName(year, month, day)
                     const isWeekend = dn === 'Сб' || dn === 'Вс'
                     return (
-                      <th key={day} className={`border border-[hsl(220,16%,90%)] px-0.5 py-0.5 min-w-7 ${isWeekend ? 'bg-[hsl(0,70%,97%)]' : ''}`}>
-                        <div className="text-center">{day}</div>
-                        <div className="text-[8px] text-[hsl(215,16%,60%)]">{dn}</div>
+                      <th key={day} className={`border border-[hsl(220,16%,90%)] px-0 py-0.5 ${isWeekend ? 'bg-[hsl(0,70%,97%)]' : ''}`}>
+                        <div className="text-center leading-none">{day}</div>
+                        <div className="text-[7px] text-[hsl(215,16%,60%)] leading-none">{dn}</div>
                       </th>
                     )
                   })}
-                  <th className="border border-[hsl(220,16%,90%)] px-1 py-1 bg-[hsl(233,80%,45%)] text-white">ΣЛ</th>
-                  <th className="border border-[hsl(220,16%,90%)] px-1 py-1 bg-[hsl(233,80%,45%)] text-white">CPL</th>
-                  <th className="border border-[hsl(220,16%,90%)] px-1 py-1 bg-[hsl(142,60%,35%)] text-white">К.план</th>
-                  <th className="border border-[hsl(220,16%,90%)] px-1 py-1 bg-[hsl(217,91%,45%)] text-white">В.план</th>
-                  <th className="border border-[hsl(220,16%,90%)] px-1 py-1 bg-[hsl(142,60%,35%)] text-white">К.факт</th>
-                  <th className="border border-[hsl(220,16%,90%)] px-1 py-1 bg-[hsl(217,91%,45%)] text-white">В.факт</th>
-                  <th className="border border-[hsl(220,16%,90%)] px-1 py-1 bg-[hsl(38,90%,40%)] text-white">SR%</th>
+                  <th className="border border-[hsl(220,16%,90%)] px-0.5 py-1 bg-[hsl(289,60%,45%)] text-white">Бюдж</th>
+                  <th className="border border-[hsl(220,16%,90%)] px-0.5 py-1 bg-[hsl(289,60%,45%)] text-white">CPL</th>
+                  <th className="border border-[hsl(220,16%,90%)] px-0.5 py-1 bg-[hsl(289,60%,45%)] text-white">ΣЛ</th>
+                  <th className="border border-[hsl(220,16%,90%)] px-0.5 py-1 bg-[hsl(289,60%,45%)] text-white">SR%</th>
+                  <th className="border border-[hsl(220,16%,90%)] px-0.5 py-1 bg-[hsl(142,60%,35%)] text-white">К.</th>
+                  <th className="border border-[hsl(220,16%,90%)] px-0.5 py-1 bg-[hsl(217,91%,45%)] text-white">В.</th>
                 </tr>
               </thead>
               <tbody>
                 {GROUPS.map((group) => {
                   const chs = groupedChannels[group] ?? []
                   if (chs.length === 0) return null
-                  let gBudget = 0, gLeads = 0, gPlanC = 0, gPlanI = 0, gFactC = 0, gFactI = 0
+                  let gBudget = 0, gLeads = 0
                   for (const ch of chs) {
                     const p = getPlan(ch.name)
                     gBudget += p.budget
-                    const tl = calcTotalLeads(p.days)
-                    gLeads += tl
-                    gPlanC += calcPlanContracts(p.rl, p.sr)
-                    gPlanI += calcPlanIssued(tl, p.sr)
+                    gLeads += calcTotalLeads(p.days)
                   }
                   return (
                     <FragmentGroup
@@ -295,10 +276,6 @@ export function PlanFactTab() {
                       onUpdateParam={updateParam}
                       groupBudget={gBudget}
                       groupLeads={gLeads}
-                      groupPlanContracts={gPlanC}
-                      groupPlanIssued={gPlanI}
-                      groupFactContracts={gFactC}
-                      groupFactIssued={gFactI}
                     />
                   )
                 })}
@@ -308,20 +285,20 @@ export function PlanFactTab() {
                   <td className="border border-[hsl(220,16%,90%)] px-2 py-1 sticky left-0 bg-[hsl(217,91%,95%)]">ИТОГО</td>
                   <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center tabular-nums">{formatNumber(grandTotals.budget)}</td>
                   <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center tabular-nums text-[hsl(215,16%,47%)]">—</td>
-                  <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center tabular-nums">{grandTotals.leads}</td>
+                  <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center tabular-nums">{grandTotals.totalLeads}</td>
                   <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center tabular-nums text-[hsl(215,16%,47%)]">—</td>
                   {Array.from({ length: dim }, (_, i) => {
                     const day = i + 1
                     let sum = 0
                     for (const ch of channels) sum += getPlan(ch.name).days[day] ?? 0
-                    return <td key={day} className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center tabular-nums">{sum || ''}</td>
+                    return <td key={day} className="border border-[hsl(220,16%,90%)] px-0.5 py-1 text-center tabular-nums">{sum || ''}</td>
                   })}
-                  <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(233,80%,90%)] tabular-nums">{grandTotals.leads}</td>
-                  <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(233,80%,90%)] tabular-nums">
-                    {grandTotals.leads > 0 ? (grandTotals.budget / grandTotals.leads).toFixed(0) : '—'}
+                  <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(289,60%,90%)] tabular-nums">{formatNumber(grandTotals.budget)}</td>
+                  <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(289,60%,90%)] tabular-nums">
+                    {grandTotals.factCpl > 0 ? formatNumber(Math.round(grandTotals.factCpl)) : '—'}
                   </td>
-                  <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(142,60%,90%)] tabular-nums">{grandTotals.planContracts}</td>
-                  <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(217,91%,90%)] tabular-nums">{grandTotals.planIssued}</td>
+                  <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(289,60%,90%)] tabular-nums">{grandTotals.totalLeads}</td>
+                  <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(38,90%,90%)] tabular-nums">{grandTotals.factSR.toFixed(1)}%</td>
                   <td colSpan={2} className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center">
                     <div className="flex items-center gap-1 justify-center">
                       <Input
@@ -343,9 +320,6 @@ export function PlanFactTab() {
                       </Button>
                     </div>
                   </td>
-                  <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(38,90%,90%)] tabular-nums">
-                    {grandTotals.factSR.toFixed(1)}%
-                  </td>
                 </tr>
               </tbody>
             </table>
@@ -353,14 +327,13 @@ export function PlanFactTab() {
         </div>
 
         {/* Formula legend */}
-        <div className="mt-2 bg-[hsl(220,20%,98%)] border border-[hsl(220,16%,90%)] rounded p-2 text-[10px] text-[hsl(215,16%,47%)] flex items-center gap-4 flex-wrap">
-          <span className="font-semibold text-[hsl(215,28%,22%)]">📐 Формулы:</span>
+        <div className="mt-2 bg-[hsl(220,20%,98%)] border border-[hsl(220,16%,90%)] rounded p-2 text-[10px] text-[hsl(215,16%,47%)] flex items-center gap-3 flex-wrap">
+          <span className="font-semibold text-[hsl(215,28%,22%)]">📐 Формулы (по Excel):</span>
           <span><code className="bg-white px-1 rounded">CPL (план) = Бюджет / РЛ</code></span>
-          <span><code className="bg-white px-1 rounded">ΣЛ = Сумма дней</code></span>
+          <span><code className="bg-white px-1 rounded">ΣЛ = SUM(дней)</code></span>
           <span><code className="bg-white px-1 rounded">CPL (факт) = Бюджет / ΣЛ</code></span>
-          <span><code className="bg-white px-1 rounded">К.план = РЛ × SR% / 100</code></span>
-          <span><code className="bg-white px-1 rounded">В.план = ΣЛ × SR% / 100</code></span>
           <span><code className="bg-white px-1 rounded">SR% (факт) = К.факт / ΣЛ × 100</code></span>
+          <span className="text-[hsl(142,60%,35%)]"><code className="bg-white px-1 rounded">К.факт, В.факт — вводятся вручную</code></span>
         </div>
       </div>
 
@@ -380,17 +353,13 @@ interface FragmentGroupProps {
   onUpdateParam: (channel: string, field: 'budget' | 'cpl' | 'rl' | 'sr', value: number) => void
   groupBudget: number
   groupLeads: number
-  groupPlanContracts: number
-  groupPlanIssued: number
-  groupFactContracts: number
-  groupFactIssued: number
 }
 
 function FragmentGroup({
   group, channels, dim, year, month, getPlan, onUpdateDay, onUpdateParam,
-  groupBudget, groupLeads, groupPlanContracts, groupPlanIssued,
+  groupBudget, groupLeads,
 }: FragmentGroupProps) {
-  const totalCols = 5 + dim + 4 + 3
+  const totalCols = 1 + 4 + dim + 6
   return (
     <>
       <tr className="bg-[hsl(224,56%,25%)] text-white font-semibold">
@@ -403,18 +372,16 @@ function FragmentGroup({
         const totalLeads = calcTotalLeads(p.days)
         const planCpl = calcPlanCPL(p.budget, p.rl)
         const factCpl = calcFactCPL(p.budget, totalLeads)
-        const planContracts = calcPlanContracts(p.rl, p.sr)
-        const planIssued = calcPlanIssued(totalLeads, p.sr)
+        // Per-channel fact contracts/issued not tracked (only grand total) — show dash
         return (
           <tr key={ch.id} className="hover:bg-[hsl(220,23%,97%)]">
-            <td className="border border-[hsl(220,16%,90%)] px-2 py-0.5 sticky left-0 bg-white truncate max-w-32" title={ch.name}>{ch.name}</td>
-            {/* PLAN section */}
+            <td className="border border-[hsl(220,16%,90%)] px-1 py-0.5 sticky left-0 bg-white truncate" title={ch.name}>{ch.name}</td>
+            {/* ПЛАН */}
             <ParamCell value={p.budget} onCommit={(v) => onUpdateParam(ch.name, 'budget', v)} />
-            {/* CPL is computed, not editable */}
-            <ComputedCell value={planCpl} format="currency" title={`= ${p.budget} / ${p.rl}`} />
+            <ComputedCell value={planCpl} title={`= ${p.budget} / ${p.rl}`} />
             <ParamCell value={p.rl} onCommit={(v) => onUpdateParam(ch.name, 'rl', v)} />
             <ParamCell value={p.sr} onCommit={(v) => onUpdateParam(ch.name, 'sr', v)} suffix="%" />
-            {/* DAYS */}
+            {/* Days */}
             {Array.from({ length: dim }, (_, i) => {
               const day = i + 1
               return (
@@ -423,17 +390,15 @@ function FragmentGroup({
                 </td>
               )
             })}
-            {/* НАРАСТАЮЩИМ */}
-            <td className="border border-[hsl(220,16%,90%)] px-1 py-0.5 text-center bg-[hsl(233,80%,95%)] tabular-nums font-semibold" title="Σ всех дней">{totalLeads || ''}</td>
-            <td className="border border-[hsl(220,16%,90%)] px-1 py-0.5 text-center bg-[hsl(233,80%,95%)] tabular-nums" title={`= ${p.budget} / ${totalLeads}`}>
-              {factCpl > 0 ? formatNumber(Math.round(factCpl)) : ''}
+            {/* ФАКТ */}
+            <td className="border border-[hsl(220,16%,90%)] px-1 py-0.5 text-center bg-[hsl(289,60%,95%)] tabular-nums" title="Бюджет = план">{formatNumber(p.budget)}</td>
+            <td className="border border-[hsl(220,16%,90%)] px-1 py-0.5 text-center bg-[hsl(289,60%,95%)] tabular-nums" title={`= ${p.budget} / ${totalLeads}`}>
+              {factCpl > 0 ? formatNumber(Math.round(factCpl)) : '—'}
             </td>
-            <td className="border border-[hsl(220,16%,90%)] px-1 py-0.5 text-center bg-[hsl(142,60%,95%)] tabular-nums" title={`= ${p.rl} × ${p.sr} / 100`}>{planContracts || ''}</td>
-            <td className="border border-[hsl(220,16%,90%)] px-1 py-0.5 text-center bg-[hsl(217,91%,95%)] tabular-nums" title={`= ${totalLeads} × ${p.sr} / 100`}>{planIssued || ''}</td>
-            {/* ФАКТ — empty for individual channels, only grand total has input */}
-            <td className="border border-[hsl(220,16%,90%)] px-1 py-0.5 text-center bg-[hsl(220,20%,98%)]"></td>
-            <td className="border border-[hsl(220,16%,90%)] px-1 py-0.5 text-center bg-[hsl(220,20%,98%)]"></td>
-            <td className="border border-[hsl(220,16%,90%)] px-1 py-0.5 text-center bg-[hsl(220,20%,98%)]"></td>
+            <td className="border border-[hsl(220,16%,90%)] px-1 py-0.5 text-center bg-[hsl(289,60%,95%)] tabular-nums font-semibold" title="= Σ дней">{totalLeads || ''}</td>
+            <td className="border border-[hsl(220,16%,90%)] px-1 py-0.5 text-center bg-[hsl(220,20%,98%)] tabular-nums text-[hsl(215,16%,47%)]" title="SR% факт — на уровне итога">—</td>
+            <td className="border border-[hsl(220,16%,90%)] px-1 py-0.5 text-center bg-[hsl(220,20%,98%)] tabular-nums text-[hsl(215,16%,47%)]">—</td>
+            <td className="border border-[hsl(220,16%,90%)] px-1 py-0.5 text-center bg-[hsl(220,20%,98%)] tabular-nums text-[hsl(215,16%,47%)]">—</td>
           </tr>
         )
       })}
@@ -443,13 +408,12 @@ function FragmentGroup({
         <td className="border border-[hsl(220,16%,90%)] px-1 py-1"></td>
         <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center tabular-nums">{groupLeads}</td>
         <td className="border border-[hsl(220,16%,90%)] px-1 py-1"></td>
-        {Array.from({ length: dim }, (_, i) => <td key={i} className="border border-[hsl(220,16%,90%)] px-1 py-1"></td>)}
-        <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(233,80%,90%)] tabular-nums">{groupLeads}</td>
-        <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(233,80%,90%)] tabular-nums">
+        {Array.from({ length: dim }, (_, i) => <td key={i} className="border border-[hsl(220,16%,90%)] px-0.5 py-1"></td>)}
+        <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(289,60%,90%)] tabular-nums">{formatNumber(groupBudget)}</td>
+        <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(289,60%,90%)] tabular-nums">
           {groupLeads > 0 ? formatNumber(Math.round(groupBudget / groupLeads)) : ''}
         </td>
-        <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(142,60%,90%)] tabular-nums">{groupPlanContracts}</td>
-        <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(217,91%,90%)] tabular-nums">{groupPlanIssued}</td>
+        <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(289,60%,90%)] tabular-nums">{groupLeads}</td>
         <td colSpan={3} className="border border-[hsl(220,16%,90%)]"></td>
       </tr>
     </>
@@ -473,14 +437,14 @@ function ParamCell({ value, onCommit, suffix }: { value: number; onCommit: (v: n
             if (e.key === 'Enter') { setEditing(false); onCommit(Number(draft) || 0) }
             if (e.key === 'Escape') setEditing(false)
           }}
-          className="w-full h-6 px-1 text-[10px] text-center border border-[hsl(221,60%,38%)] rounded focus:outline-none"
+          className="w-full h-5 px-0.5 text-[10px] text-center border border-[hsl(221,60%,38%)] rounded focus:outline-none"
         />
       </td>
     )
   }
   return (
     <td
-      className="border border-[hsl(220,16%,90%)] px-1 py-0.5 text-center tabular-nums cursor-text hover:bg-[hsl(217,91%,95%)]"
+      className="border border-[hsl(220,16%,90%)] px-0.5 py-0.5 text-center tabular-nums cursor-text hover:bg-[hsl(217,91%,95%)]"
       onClick={() => { setDraft(String(value)); setEditing(true) }}
       title="Клик для редактирования"
     >
@@ -489,16 +453,13 @@ function ParamCell({ value, onCommit, suffix }: { value: number; onCommit: (v: n
   )
 }
 
-function ComputedCell({ value, format, title }: { value: number; format?: 'currency'; title?: string }) {
-  const display = format === 'currency'
-    ? (value > 0 ? formatNumber(Math.round(value)) : '')
-    : (value || '')
+function ComputedCell({ value, title }: { value: number; title?: string }) {
   return (
     <td
-      className="border border-[hsl(220,16%,90%)] px-1 py-0.5 text-center tabular-nums bg-[hsl(220,20%,98%)] text-[hsl(215,16%,47%)] italic"
+      className="border border-[hsl(220,16%,90%)] px-0.5 py-0.5 text-center tabular-nums bg-[hsl(220,20%,98%)] text-[hsl(215,16%,47%)] italic"
       title={title}
     >
-      {display}
+      {value > 0 ? formatNumber(Math.round(value)) : ''}
     </td>
   )
 }
@@ -519,13 +480,13 @@ function DayCell({ value, onCommit }: { value: number; onCommit: (v: number) => 
           if (e.key === 'Enter') { setEditing(false); onCommit(Number(draft) || 0) }
           if (e.key === 'Escape') setEditing(false)
         }}
-        className="w-full h-6 px-0.5 text-[10px] text-center border border-[hsl(221,60%,38%)] rounded focus:outline-none"
+        className="w-full h-5 px-0 text-[10px] text-center border border-[hsl(221,60%,38%)] rounded focus:outline-none"
       />
     )
   }
   return (
     <span
-      className="block w-full h-6 leading-6 cursor-text tabular-nums"
+      className="block w-full h-5 leading-5 cursor-text tabular-nums"
       onClick={() => { setDraft(String(value)); setEditing(true) }}
     >
       {value || ''}

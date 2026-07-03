@@ -38,6 +38,9 @@ export async function POST(req: NextRequest) {
         // Skip empty rows (no model + no client)
         if (!data.model && !data.client) continue
 
+        const j = Number(data.j) || 0
+        const o = Number(data.o) || 0
+        const k = Number(data.k) || 0
         const deal = await tx.deal.create({
           data: {
             model: String(data.model ?? 'Tenet T7'),
@@ -46,10 +49,11 @@ export async function POST(req: NextRequest) {
             dateIssued: data.dateIssued ? String(data.dateIssued) : null,
             seller: data.seller ? String(data.seller) : null,
             client: data.client ? String(data.client) : null,
-            jok: Number(data.jok) || 0,
-            j: Number(data.j) || 0,
-            o: Number(data.o) || 0,
-            k: Number(data.k) || 0,
+            // jok = j + o + k (always auto-calculated, ignore any provided jok)
+            jok: j + o + k,
+            j,
+            o,
+            k,
             risk: String(data.risk ?? '1'),
             kr: String(data.kr ?? '0'),
             ti: String(data.ti ?? '0'),

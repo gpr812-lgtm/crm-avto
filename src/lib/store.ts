@@ -94,7 +94,12 @@ export const useCrmStore = create<CrmState>((set, get) => ({
   },
 
   addDeal: async (data) => {
-    const { deal } = await api.createDeal(data)
+    // Compute jok locally before sending (server also computes, but for instant UI feedback)
+    const j = Number(data.j) || 0
+    const o = Number(data.o) || 0
+    const k = Number(data.k) || 0
+    const { jok: _ignored, ...rest } = data
+    const { deal } = await api.createDeal({ ...rest, jok: j + o + k })
     set((s) => ({ deals: [...s.deals, deal] }))
     get().loadStats()
     get().loadHistory()
@@ -102,9 +107,17 @@ export const useCrmStore = create<CrmState>((set, get) => ({
   },
 
   editDeal: async (id, data) => {
-    // Optimistic update
+    // Optimistic update — also recompute jok = j + o + k locally if j/o/k changes
     set((s) => ({
-      deals: s.deals.map((d) => (d.id === id ? { ...d, ...data } as Deal : d)),
+      deals: s.deals.map((d) => {
+        if (d.id !== id) return d
+        const merged = { ...d, ...data } as Deal
+        // Always recompute jok locally (matches server-side logic)
+        if ('j' in data || 'o' in data || 'k' in data) {
+          merged.jok = (Number(merged.j) || 0) + (Number(merged.o) || 0) + (Number(merged.k) || 0)
+        }
+        return merged
+      }),
     }))
     try {
       const { deal } = await api.updateDeal(id, data)

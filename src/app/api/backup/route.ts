@@ -84,11 +84,16 @@ export async function POST(req: NextRequest) {
       await tx.deal.deleteMany({})
 
       if (body.deals?.length) {
-        await tx.deal.createMany({ data: body.deals.map((d: Record<string, unknown>) => ({
-          ...d,
-          // strip any non-schema fields
-          id: d.id as string,
-        })) })
+        await tx.deal.createMany({
+          data: body.deals.map((d: Record<string, unknown>) => {
+            const j = Number(d.j) || 0
+            const o = Number(d.o) || 0
+            const k = Number(d.k) || 0
+            // Recompute jok from j+o+k (don't trust stored value)
+            const { jok: _ignored, ...rest } = d
+            return { ...rest, jok: j + o + k }
+          }),
+        })
       }
       if (body.columns?.length) await tx.dealColumn.createMany({ data: body.columns })
       if (body.options) {

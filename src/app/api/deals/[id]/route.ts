@@ -13,16 +13,26 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'Deal not found' }, { status: 404 })
     }
 
+    // Always recompute jok = j + o + k (jok is auto-calculated, never client-set)
+    // Strip jok from body to prevent manual override
+    const { jok: _ignoredJok, ...rest } = body
+    const mergedData = { ...existing, ...rest } as Record<string, unknown>
+    const j = Number(mergedData.j) || 0
+    const o = Number(mergedData.o) || 0
+    const k = Number(mergedData.k) || 0
+    const newJok = j + o + k
+    const updateData = { ...rest, jok: newJok }
+
     // Detect changes for history
     const changes: string[] = []
-    for (const [k, v] of Object.entries(body)) {
+    for (const [k, v] of Object.entries(updateData)) {
       const oldV = (existing as Record<string, unknown>)[k]
       if (String(oldV ?? '') !== String(v ?? '')) {
         changes.push(`${k}: "${String(oldV ?? '')}" → "${String(v ?? '')}"`)
       }
     }
 
-    const deal = await db.deal.update({ where: { id }, data: body })
+    const deal = await db.deal.update({ where: { id }, data: updateData })
     if (changes.length > 0) {
       await addHistory('edit', `Изменена сделка ${deal.model} — ${deal.client || 'без клиента'}: ${changes.join(', ')}`)
     }

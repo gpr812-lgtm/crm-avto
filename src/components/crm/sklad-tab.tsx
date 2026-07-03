@@ -1051,10 +1051,27 @@ function DealCell({ deal, col, options, hasLink, onEdit, onAddOption, onOpenLink
 
   if (col.type === 'number') {
     const n = Number(rawValue) || 0
-    const cls = n > 0 ? 'text-[#28a745]' : n < 0 ? 'text-[#dc3545]' : ''
+    const cls = n > 0 ? 'text-[hsl(142,60%,35%)]' : n < 0 ? 'text-[hsl(0,72%,45%)]' : ''
+
+    // ЖОК is auto-computed = Ж + О + К, read-only
+    if (col.key === 'jok') {
+      const j = Number((deal as Record<string, unknown>).j) || 0
+      const o = Number((deal as Record<string, unknown>).o) || 0
+      const k = Number((deal as Record<string, unknown>).k) || 0
+      const computed = j + o + k
+      return (
+        <td
+          className="border border-[hsl(220,16%,90%)] px-2 py-1 text-center tabular-nums bg-[hsl(217,91%,95%)] text-[hsl(221,60%,30%)] font-semibold cursor-not-allowed"
+          title={`= Ж + О + К = ${j} + ${o} + ${k} = ${computed} (авто-расчёт, не редактируется)`}
+        >
+          {formatNumber(computed)}
+        </td>
+      )
+    }
+
     return (
       <td
-        className={`border border-[#e0e0e0] px-2 py-1 text-center tabular-nums crm-editable cursor-text ${cls}`}
+        className={`border border-[hsl(220,16%,90%)] px-2 py-1 text-center tabular-nums crm-editable cursor-text ${cls}`}
         onClick={() => !editing && startEdit()}
       >
         {editing ? (
@@ -1068,7 +1085,7 @@ function DealCell({ deal, col, options, hasLink, onEdit, onAddOption, onOpenLink
               if (e.key === 'Enter') commit()
               if (e.key === 'Escape') setEditing(false)
             }}
-            className="w-full h-6 px-1 text-xs border border-[#2a5298] rounded focus:outline-none"
+            className="w-full h-6 px-1 text-xs border border-[hsl(221,60%,38%)] rounded focus:outline-none"
           />
         ) : (
           formatNumber(n)
