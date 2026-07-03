@@ -158,12 +158,34 @@ model PlanEntry {
 
 // Факт по месяцам (общий на месяц)
 model FactEntry {
-  id         Int      @id @default(autoincrement())
-  monthKey   String   @unique // YYYY-MM
-  contracts  Int      @default(0)
-  issued     Int      @default(0)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id            Int      @id @default(autoincrement())
+  monthKey      String   @unique // YYYY-MM
+  contracts     Int      @default(0)
+  issued        Int      @default(0)
+  // Plan values (entered manually in the "План/Факт по показателям" table)
+  planContracts Int      @default(0)
+  planIssued    Int      @default(0)
+  planJ         Float    @default(0)
+  planO         Float    @default(0)
+  planK         Float    @default(0)
+  planKr        Int      @default(0)
+  planTi        Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// Per-channel fact (К., В. entered manually per channel per month)
+model ChannelFact {
+  id        Int      @id @default(autoincrement())
+  monthKey  String   // YYYY-MM
+  channel   String   // channel name
+  contracts Int      @default(0)
+  issued    Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([monthKey, channel])
+  @@index([monthKey])
 }
 
 // ============================

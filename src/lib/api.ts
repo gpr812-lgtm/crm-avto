@@ -30,7 +30,18 @@ export interface PlanFactResponse {
     rl: number
     sr: number
   }>
-  fact: { contracts: number; issued: number }
+  channelFacts: Record<string, { contracts: number; issued: number }>
+  fact: {
+    contracts: number
+    issued: number
+    planContracts: number
+    planIssued: number
+    planJ: number
+    planO: number
+    planK: number
+    planKr: number
+    planTi: number
+  }
 }
 
 async function handle<T>(promise: Promise<Response>): Promise<T> {
@@ -240,12 +251,27 @@ export const api = {
       body: JSON.stringify(data),
     })),
 
-  updateFact: (monthKey: string, data: { contracts?: number; issued?: number }) =>
-    handle<{ fact: { monthKey: string; contracts: number; issued: number } }>(fetch('/api/plan-fact', {
+  updateChannelFact: (data: { monthKey: string; channel: string; channelFactContracts?: number; channelFactIssued?: number }) =>
+    handle<{ channelFact: unknown }>(fetch('/api/plan-fact', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })),
+
+  updateFact: (monthKey: string, data: {
+    contracts?: number; issued?: number;
+    planContracts?: number; planIssued?: number;
+    planJ?: number; planO?: number; planK?: number;
+    planKr?: number; planTi?: number;
+  }) =>
+    handle<{ fact: unknown }>(fetch('/api/plan-fact', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ monthKey, ...data }),
     })),
+
+  getSkladMonthFact: (month: string) =>
+    handle<{ contracts: number; issued: number; j: number; o: number; k: number; jok: number; kr: number; ti: number }>(fetch(`/api/sklad-month-fact?month=${encodeURIComponent(month)}`)),
 
   // ============================
   // History

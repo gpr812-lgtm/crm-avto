@@ -4,8 +4,9 @@ import { db } from '@/lib/db'
 // GET /api/plan-fact?month=YYYY-MM
 // Returns: {
 //   channels: Channel[],
-//   plan: { "<channelName>": { days: {1: n,...}, budget, cpl, rl, sr } },
-//   fact: { contracts, issued }
+//   plan: { "<channelName>": { days, budget, cpl, rl, sr } },
+//   channelFacts: { "<channelName>": { contracts, issued } },
+//   fact: { contracts, issued, planContracts, planIssued, planJ, planO, planK, planKr, planTi }
 // }
 export async function GET(req: NextRequest) {
   try {
@@ -13,9 +14,12 @@ export async function GET(req: NextRequest) {
     const month = url.searchParams.get('month')
     if (!month) return NextResponse.json({ error: 'month required' }, { status: 400 })
 
-    const channels = await db.channel.findMany({ orderBy: { order: 'asc' } })
-    const planEntries = await db.planEntry.findMany({ where: { monthKey: month } })
-    const factEntry = await db.factEntry.findUnique({ where: { monthKey: month } })
+    const [channels, planEntries, factEntry, channelFacts] = await Promise.all([
+      db.channel.findMany({ orderBy: { order: 'asc' } }),
+      db.planEntry.findMany({ where: { monthKey: month } }),
+      db.factEntry.findUnique({ where: { monthKey: month } }),
+      db.channelFact.findMany({ where: { monthKey: month } }),
+    ])
 
     // Group plan entries by channel
     const plan: Record<
@@ -24,7 +28,6 @@ export async function GET(req: NextRequest) {
     > = {}
 
     for (const ch of channels) {
-      // Initialise from channel defaults (FIX: original bug — channels added later didn't appear in planData)
       plan[ch.name] = {
         days: {},
         budget: ch.budget,
@@ -36,24 +39,45 @@ export async function GET(req: NextRequest) {
 
     for (const p of planEntries) {
       if (!plan[p.channel]) {
-        // Channel was deleted but plan entries remain — recreate placeholder
         plan[p.channel] = { days: {}, budget: p.budget, cpl: p.cpl, rl: p.rl, sr: p.sr }
       }
-      // Day-level plan
       if (p.day > 0) {
         plan[p.channel].days[p.day] = p.leads
       }
-      // Channel-level params (last write wins — should be same for all days of same channel)
       plan[p.channel].budget = p.budget
       plan[p.channel].cpl = p.cpl
       plan[p.channel].rl = p.rl
       plan[p.channel].sr = p.sr
     }
 
+    // Group channel facts
+    const channelFactsMap: Record<string, { contracts: number; issued: number }> = {}
+    for (const cf of channelFacts) {
+      channelFactsMap[cf.channel] = { contracts: cf.contracts, issued: cf.issued }
+    }
+
     return NextResponse.json({
       channels,
       plan,
-      fact: factEntry ? { contracts: factEntry.contracts, issued: factEntry.issued } : { contracts: 0, issued: 0 },
+      channelFacts: channelFactsMap,
+      fact: factEntry
+        ? {
+            contracts: factEntry.contracts,
+            issued: factEntry.issued,
+            planContracts: factEntry.planContracts,
+            planIssued: factEntry.planIssued,
+            planJ: factEntry.planJ,
+            planO: factEntry.planO,
+            planK: factEntry.planK,
+            planKr: factEntry.planKr,
+            planTi: factEntry.planTi,
+          }
+        : {
+            contracts: 0, issued: 0,
+            planContracts: 0, planIssued: 0,
+            planJ: 0, planO: 0, planK: 0,
+            planKr: 0, planTi: 0,
+          },
     })
   } catch (e) {
     console.error('GET /api/plan-fact error:', e)
@@ -63,10 +87,30 @@ export async function GET(req: NextRequest) {
 
 // PATCH /api/plan-fact — upsert a single plan entry (day leads) or update channel params
 // Body: { monthKey, channel, day?, leads?, budget?, cpl?, rl?, sr? }
+//       OR { monthKey, channel, channelFactContracts?, channelFactIssued? } — per-channel К./В.
 export async function PATCH(req: NextRequest) {
   try {
-    const { monthKey, channel, day, leads, budget, cpl, rl, sr } = await req.json()
+    const body = await req.json()
+    const { monthKey, channel, day, leads, budget, cpl, rl, sr, channelFactContracts, channelFactIssued } = body
     if (!monthKey || !channel) return NextResponse.json({ error: 'monthKey, channel required' }, { status: 400 })
+
+    // Per-channel fact (К., В.) — entered manually per channel
+    if (channelFactContracts !== undefined || channelFactIssued !== undefined) {
+      const cf = await db.channelFact.upsert({
+        where: { monthKey_channel: { monthKey, channel } },
+        update: {
+          ...(channelFactContracts !== undefined ? { contracts: Number(channelFactContracts) || 0 } : {}),
+          ...(channelFactIssued !== undefined ? { issued: Number(channelFactIssued) || 0 } : {}),
+        },
+        create: {
+          monthKey,
+          channel,
+          contracts: Number(channelFactContracts) || 0,
+          issued: Number(channelFactIssued) || 0,
+        },
+      })
+      return NextResponse.json({ channelFact: cf })
+    }
 
     // Update day-level plan
     if (day !== undefined) {
@@ -80,7 +124,6 @@ export async function PATCH(req: NextRequest) {
         where: { monthKey_channel_day: { monthKey, channel, day: Number(day) } },
         update: {
           leads: Number(leads) || 0,
-          // Also persist channel params so they're saved per-month
           ...(budget !== undefined ? { budget: Number(budget) } : {}),
           ...(cpl !== undefined ? { cpl: Number(cpl) } : {}),
           ...(rl !== undefined ? { rl: Number(rl) } : {}),
@@ -100,9 +143,8 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ entry })
     }
 
-    // Update channel-level params — update all entries for this channel+month, plus the Channel itself
+    // Update channel-level params
     if (budget !== undefined || cpl !== undefined || rl !== undefined || sr !== undefined) {
-      // Persist to Channel master record
       const ch = await db.channel.findUnique({ where: { name: channel } })
       if (ch) {
         await db.channel.update({
@@ -116,7 +158,6 @@ export async function PATCH(req: NextRequest) {
         })
       }
 
-      // Update all existing plan entries for this channel+month
       await db.planEntry.updateMany({
         where: { monthKey, channel },
         data: {
@@ -137,24 +178,29 @@ export async function PATCH(req: NextRequest) {
   }
 }
 
-// PUT /api/plan-fact — update fact for a month
-// Body: { monthKey, contracts?, issued? }
+// PUT /api/plan-fact — update fact and/or plan values for a month
+// Body: { monthKey, contracts?, issued?, planContracts?, planIssued?, planJ?, planO?, planK?, planKr?, planTi? }
 export async function PUT(req: NextRequest) {
   try {
-    const { monthKey, contracts, issued } = await req.json()
+    const body = await req.json()
+    const { monthKey, contracts, issued, planContracts, planIssued, planJ, planO, planK, planKr, planTi } = body
     if (!monthKey) return NextResponse.json({ error: 'monthKey required' }, { status: 400 })
+
+    const data: Record<string, unknown> = {}
+    if (contracts !== undefined) data.contracts = Number(contracts) || 0
+    if (issued !== undefined) data.issued = Number(issued) || 0
+    if (planContracts !== undefined) data.planContracts = Number(planContracts) || 0
+    if (planIssued !== undefined) data.planIssued = Number(planIssued) || 0
+    if (planJ !== undefined) data.planJ = Number(planJ) || 0
+    if (planO !== undefined) data.planO = Number(planO) || 0
+    if (planK !== undefined) data.planK = Number(planK) || 0
+    if (planKr !== undefined) data.planKr = Number(planKr) || 0
+    if (planTi !== undefined) data.planTi = Number(planTi) || 0
 
     const fact = await db.factEntry.upsert({
       where: { monthKey },
-      update: {
-        ...(contracts !== undefined ? { contracts: Number(contracts) || 0 } : {}),
-        ...(issued !== undefined ? { issued: Number(issued) || 0 } : {}),
-      },
-      create: {
-        monthKey,
-        contracts: Number(contracts) || 0,
-        issued: Number(issued) || 0,
-      },
+      update: data,
+      create: { monthKey, ...data },
     })
     return NextResponse.json({ fact })
   } catch (e) {

@@ -140,11 +140,21 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
   }, [deals, filters, dateFrom, dateTo, sortKey, sortDir])
 
   // Totals for number columns
+  // EXCLUDE deals with status=Отказ/Призрак or risk=4 from sums of Ж, О, К, ЖОК, ТИ, КР
+  // (these deals don't count toward financial totals)
+  const EXCLUDED_FROM_TOTALS = new Set(['j', 'o', 'k', 'jok', 'ti', 'kr'])
+  const isDealExcludedFromTotals = (d: Deal) =>
+    d.status === 'Отказ' || d.status === 'Призрак' || d.risk === '4'
+
   const totals = useMemo(() => {
     const t: Record<string, number> = {}
     for (const c of columns) {
       if (c.type === 'number') {
-        t[c.key] = filteredDeals.reduce((sum, d) => sum + ((d as Record<string, unknown>)[c.key] as number ?? 0), 0)
+        const shouldExclude = EXCLUDED_FROM_TOTALS.has(c.key)
+        t[c.key] = filteredDeals.reduce((sum, d) => {
+          if (shouldExclude && isDealExcludedFromTotals(d)) return sum
+          return sum + ((d as Record<string, unknown>)[c.key] as number ?? 0)
+        }, 0)
       }
     }
     return t
@@ -612,7 +622,8 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
               const rowClass =
                 deal.status === 'Продан' ? 'crm-status-sold' :
                 deal.status === 'Склад' ? 'crm-status-stock' :
-                deal.status === 'Отказ' ? 'crm-status-refusal' : ''
+                deal.status === 'Отказ' ? 'crm-status-refusal' :
+                deal.status === 'Призрак' ? 'crm-status-ghost' : ''
               const isSelected = selectedDealIds.has(deal.id)
               const hasLink = !!evalLinks[deal.id]
 

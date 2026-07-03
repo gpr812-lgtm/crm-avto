@@ -291,6 +291,7 @@ export default function HomePage() {
           <StatBadge label="Продан" value={stats.sold} variant="success" />
           <StatBadge label="Склад" value={stats.inStock} variant="warning" />
           <StatBadge label="Отказ" value={stats.refused} variant="danger" />
+          {stats.ghost > 0 && <StatBadge label="Призрак" value={stats.ghost} variant="ghost" />}
           <div className="w-px h-4 bg-[hsl(220,16%,90%)] mx-1" />
           <StatBadge label="Σ ЖОК" value={`${new Intl.NumberFormat('ru-RU').format(stats.sumJok)} ₽`} variant="info" />
           <StatBadge label="Σ К" value={`${new Intl.NumberFormat('ru-RU').format(stats.sumK)} ₽`} variant="info" />
@@ -360,6 +361,7 @@ function StatusBadge({ status }: { status: string }) {
     'Продан': 'bg-[hsl(142,60%,95%)] text-[hsl(142,60%,30%)] border-[hsl(142,50%,70%)]',
     'Склад': 'bg-[hsl(38,90%,95%)] text-[hsl(32,80%,35%)] border-[hsl(38,80%,70%)]',
     'Отказ': 'bg-[hsl(0,70%,96%)] text-[hsl(0,70%,40%)] border-[hsl(0,60%,75%)]',
+    'Призрак': 'bg-[hsl(280,20%,95%)] text-[hsl(280,30%,40%)] border-[hsl(280,20%,70%)]',
   }
   return (
     <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${styles[status] || 'bg-gray-100 text-gray-700 border-gray-300'}`}>
@@ -369,13 +371,14 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 // Stat badge component
-function StatBadge({ label, value, variant }: { label: string; value: string | number; variant: 'neutral' | 'success' | 'warning' | 'danger' | 'info' }) {
+function StatBadge({ label, value, variant }: { label: string; value: string | number; variant: 'neutral' | 'success' | 'warning' | 'danger' | 'info' | 'ghost' }) {
   const styles = {
     neutral: 'bg-[hsl(220,20%,95%)] text-[hsl(215,28%,22%)]',
     success: 'bg-[hsl(142,60%,95%)] text-[hsl(142,60%,30%)]',
     warning: 'bg-[hsl(38,90%,95%)] text-[hsl(32,80%,35%)]',
     danger: 'bg-[hsl(0,70%,96%)] text-[hsl(0,70%,40%)]',
     info: 'bg-[hsl(217,91%,95%)] text-[hsl(221,60%,35%)]',
+    ghost: 'bg-[hsl(280,20%,95%)] text-[hsl(280,30%,40%)]',
   }
   return (
     <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium ${styles[variant]}`}>

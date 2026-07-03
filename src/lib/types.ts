@@ -77,6 +77,7 @@ export interface Stats {
   sold: number
   inStock: number
   refused: number
+  ghost: number
   sumJok: number
   sumK: number
   tiCount: number
