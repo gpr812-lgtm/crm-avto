@@ -223,8 +223,8 @@ export function PlanFactTab() {
 
         <div className="flex gap-2 flex-wrap">
           <Badge variant="outline" className="bg-[hsl(220,20%,95%)]">Бюджет: {formatNumber(grandTotals.budget)} ₽</Badge>
-          <Badge variant="outline" className="bg-[hsl(220,20%,95%)]">РЛ: {grandTotals.totalRl}</Badge>
-          <Badge variant="outline" className="bg-[hsl(220,20%,95%)]">ΣЛ: {grandTotals.totalLeads}</Badge>
+          <Badge variant="outline" className="bg-[hsl(220,20%,95%)]">РЛ план: {grandTotals.totalRl}</Badge>
+          <Badge variant="outline" className="bg-[hsl(220,20%,95%)]">РЛ факт: {grandTotals.totalLeads}</Badge>
           <Badge className="bg-[hsl(142,60%,35%)] hover:bg-[hsl(142,60%,35%)]">К.факт: {grandTotals.factContractsSum}</Badge>
           <Badge className="bg-[hsl(217,91%,45%)] hover:bg-[hsl(217,91%,45%)]">В.факт: {grandTotals.factIssuedSum}</Badge>
           <Badge className="bg-[hsl(38,90%,40%)] hover:bg-[hsl(38,90%,40%)]">SR%: {grandTotals.factSR.toFixed(1)}%</Badge>
@@ -285,7 +285,7 @@ export function PlanFactTab() {
                   })}
                   <th className="border border-[hsl(220,16%,90%)] px-0.5 py-1 bg-[hsl(289,60%,45%)] text-white">Бюдж</th>
                   <th className="border border-[hsl(220,16%,90%)] px-0.5 py-1 bg-[hsl(289,60%,45%)] text-white">CPL</th>
-                  <th className="border border-[hsl(220,16%,90%)] px-0.5 py-1 bg-[hsl(289,60%,45%)] text-white">ΣЛ</th>
+                  <th className="border border-[hsl(220,16%,90%)] px-0.5 py-1 bg-[hsl(289,60%,45%)] text-white">РЛ</th>
                   <th className="border border-[hsl(220,16%,90%)] px-0.5 py-1 bg-[hsl(289,60%,45%)] text-white">SR%</th>
                   <th className="border border-[hsl(220,16%,90%)] px-0.5 py-1 bg-[hsl(142,60%,35%)] text-white">К.</th>
                   <th className="border border-[hsl(220,16%,90%)] px-0.5 py-1 bg-[hsl(217,91%,45%)] text-white">В.</th>
@@ -346,7 +346,7 @@ export function PlanFactTab() {
                   <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(289,60%,90%)] tabular-nums" title={`= Бюджет / ΣЛ = ${grandTotals.budget} / ${grandTotals.totalLeads}`}>
                     {grandTotals.factCpl > 0 ? formatNumber(Math.round(grandTotals.factCpl)) : '—'}
                   </td>
-                  <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(289,60%,90%)] tabular-nums" title="Сумма дней по всем каналам">{grandTotals.totalLeads}</td>
+                  <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(289,60%,90%)] tabular-nums" title="РЛ факт = Σ дней по всем каналам">{grandTotals.totalLeads}</td>
                   <td className="border border-[hsl(220,16%,90%)] px-1 py-1 text-center bg-[hsl(38,90%,90%)] tabular-nums" title={`= К.факт / ΣЛ = ${grandTotals.factContractsSum} / ${grandTotals.totalLeads}`}>
                     {grandTotals.factSR.toFixed(1)}%
                   </td>
@@ -913,15 +913,19 @@ function PlanFactSummaryTable({
     }
   }
 
-  const rows: { label: string; planValue: number; planField?: PlanField; factValue: number; isComputed?: boolean; format?: 'number' | 'currency' }[] = [
+  // For КР and ТИ: fact = count/deals×100 (%), plan = target %, execution = fact%/plan%×100
+  const krFactPct = fact.contracts > 0 ? (fact.kr / fact.contracts) * 100 : 0
+  const tiFactPct = fact.contracts > 0 ? (fact.ti / fact.contracts) * 100 : 0
+
+  const rows: { label: string; planValue: number; planField?: PlanField; factValue: number; isComputed?: boolean; isPercentage?: boolean; format?: 'number' | 'currency' }[] = [
     { label: '📄 Контракты', planValue: plan.planContracts, planField: 'planContracts', factValue: fact.contracts },
     { label: '📤 Выдачи', planValue: plan.planIssued, planField: 'planIssued', factValue: fact.issued },
     { label: 'Ж', planValue: plan.planJ, planField: 'planJ', factValue: fact.j, format: 'currency' },
     { label: 'О', planValue: plan.planO, planField: 'planO', factValue: fact.o, format: 'currency' },
     { label: 'К', planValue: plan.planK, planField: 'planK', factValue: fact.k, format: 'currency' },
     { label: 'ЖОК', planValue: planJok, factValue: fact.jok, isComputed: true, format: 'currency' },
-    { label: '💳 КР', planValue: plan.planKr, planField: 'planKr', factValue: fact.kr },
-    { label: '🔗 ТИ', planValue: plan.planTi, planField: 'planTi', factValue: fact.ti },
+    { label: '💳 КР', planValue: plan.planKr, planField: 'planKr', factValue: krFactPct, isPercentage: true },
+    { label: '🔗 ТИ', planValue: plan.planTi, planField: 'planTi', factValue: tiFactPct, isPercentage: true },
   ]
 
   return (
@@ -947,10 +951,20 @@ function PlanFactSummaryTable({
         <tbody>
           {rows.map((row) => {
             const pct = row.planValue > 0 ? (row.factValue / row.planValue) * 100 : 0
-            const fmt = (v: number) => row.format === 'currency' ? formatNumber(v) : String(v)
+            const fmt = (v: number) => {
+              if (row.isPercentage) return `${v.toFixed(1)}%`
+              if (row.format === 'currency') return formatNumber(v)
+              return String(v)
+            }
+            const factTitle = row.isPercentage
+              ? `${row.label.replace(/[💳🔗]\s/, '')}: ${fact.contracts > 0 ? (row.factValue).toFixed(1) : 0}% от ${fact.contracts} сделок`
+              : undefined
             return (
               <tr key={row.label} className="hover:bg-[hsl(220,23%,97%)]">
-                <td className="border border-[hsl(220,16%,90%)] px-2 py-1 font-medium">{row.label}</td>
+                <td className="border border-[hsl(220,16%,90%)] px-2 py-1 font-medium">
+                  {row.label}
+                  {row.isPercentage && <span className="text-[9px] text-[hsl(215,16%,47%)] ml-1">(% от сделок)</span>}
+                </td>
                 <td className="border border-[hsl(220,16%,90%)] px-1 py-0.5 text-center bg-[hsl(217,91%,95%)]">
                   {row.isComputed ? (
                     <span className="tabular-nums font-semibold text-[hsl(221,60%,30%)]" title="= Ж + О + К (авто-расчёт)">
@@ -960,13 +974,14 @@ function PlanFactSummaryTable({
                     <SummaryInput
                       value={row.planValue}
                       onCommit={(v) => updatePlan(row.planField!, v)}
-                      format={row.format}
+                      format={row.isPercentage ? 'number' : row.format}
+                      suffix={row.isPercentage ? '%' : undefined}
                     />
                   ) : (
                     <span className="tabular-nums">{fmt(row.planValue)}</span>
                   )}
                 </td>
-                <td className="border border-[hsl(220,16%,90%)] px-2 py-1 text-center bg-[hsl(289,60%,95%)] tabular-nums font-semibold">
+                <td className="border border-[hsl(220,16%,90%)] px-2 py-1 text-center bg-[hsl(289,60%,95%)] tabular-nums font-semibold" title={factTitle}>
                   {fmt(row.factValue)}
                 </td>
                 <td className={`border border-[hsl(220,16%,90%)] px-2 py-1 text-center tabular-nums ${pct >= 100 ? 'bg-[hsl(142,60%,90%)] text-[hsl(142,60%,25%)]' : pct >= 50 ? 'bg-[hsl(38,90%,90%)] text-[hsl(32,80%,30%)]' : pct > 0 ? 'bg-[hsl(0,70%,96%)] text-[hsl(0,70%,40%)]' : ''}`}>
@@ -982,6 +997,7 @@ function PlanFactSummaryTable({
         <span><code className="bg-white px-1 rounded">План — вводится вручную</code></span>
         <span><code className="bg-white px-1 rounded">Факт — из Склада (статус=Продан, дата ДКП в месяце)</code></span>
         <span><code className="bg-white px-1 rounded">ЖОК план = Ж + О + К (авто)</code></span>
+        <span><code className="bg-white px-1 rounded">КР, ТИ — % от числа проданных сделок</code></span>
         <span className="text-[hsl(0,70%,40%)]"><code className="bg-white px-1 rounded">Исключаются: Отказ, Призрак, РИСК=4</code></span>
       </div>
     </div>
@@ -989,10 +1005,11 @@ function PlanFactSummaryTable({
 }
 
 // Inline input for summary table plan values
-function SummaryInput({ value, onCommit, format }: {
+function SummaryInput({ value, onCommit, format, suffix }: {
   value: number
   onCommit: (v: number) => void
   format?: 'currency' | 'number'
+  suffix?: string
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -1013,13 +1030,14 @@ function SummaryInput({ value, onCommit, format }: {
       />
     )
   }
+  const display = format === 'currency' ? formatNumber(value) : String(value)
   return (
     <span
       className="block w-full h-6 leading-6 cursor-text tabular-nums px-1 hover:bg-[hsl(217,91%,90%)] rounded"
       onClick={() => { setDraft(String(value)); setEditing(true) }}
       title="Клик для редактирования"
     >
-      {format === 'currency' ? formatNumber(value) : value}
+      {display}{suffix}
     </span>
   )
 }
