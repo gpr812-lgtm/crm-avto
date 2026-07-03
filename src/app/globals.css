@@ -41,49 +41,77 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  /* CRM brand colors */
-  --color-crm-primary: #2a5298;
-  --color-crm-primary-dark: #1e3c72;
-  --color-crm-success: #28a745;
-  --color-crm-danger: #dc3545;
-  --color-crm-warning: #ffc107;
-  --color-crm-accent: #1a73e8;
-  --color-crm-bg: #f0f2f5;
+  /* CRM brand colors — modern HSL-based */
+  --color-crm-primary: hsl(221 60% 38%);
+  --color-crm-primary-dark: hsl(224 56% 25%);
+  --color-crm-success: hsl(142 71% 45%);
+  --color-crm-danger: hsl(0 72% 51%);
+  --color-crm-warning: hsl(38 92% 50%);
+  --color-crm-accent: hsl(217 91% 60%);
+  --color-crm-bg: hsl(220 23% 96%);
 }
 
 :root {
   --radius: 0.5rem;
-  --background: #f0f2f5;
-  --foreground: #2c3e50;
-  --card: #ffffff;
-  --card-foreground: #2c3e50;
-  --popover: #ffffff;
-  --popover-foreground: #2c3e50;
-  --primary: #2a5298;
-  --primary-foreground: #ffffff;
-  --secondary: #f1f3f4;
-  --secondary-foreground: #2c3e50;
-  --muted: #f8f9fa;
-  --muted-foreground: #7f8c8d;
-  --accent: #1a73e8;
-  --accent-foreground: #ffffff;
-  --destructive: #dc3545;
-  --border: #e0e0e0;
-  --input: #e0e0e0;
-  --ring: #2a5298;
-  --chart-1: #2a5298;
-  --chart-2: #28a745;
-  --chart-3: #dc3545;
-  --chart-4: #ffc107;
-  --chart-5: #1a73e8;
-  --sidebar: #ffffff;
-  --sidebar-foreground: #2c3e50;
-  --sidebar-primary: #2a5298;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f8f9fa;
-  --sidebar-accent-foreground: #2c3e50;
-  --sidebar-border: #e0e0e0;
-  --sidebar-ring: #2a5298;
+
+  /* Modern palette — softer, more depth */
+  --background: hsl(220 23% 96%);
+  --foreground: hsl(215 28% 22%);
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(215 28% 22%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(215 28% 22%);
+  --primary: hsl(221 60% 38%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(220 20% 95%);
+  --secondary-foreground: hsl(215 28% 22%);
+  --muted: hsl(220 20% 96%);
+  --muted-foreground: hsl(215 16% 47%);
+  --accent: hsl(217 91% 60%);
+  --accent-foreground: hsl(0 0% 100%);
+  --destructive: hsl(0 72% 51%);
+  --border: hsl(220 16% 90%);
+  --input: hsl(220 16% 90%);
+  --ring: hsl(221 60% 38%);
+
+  --chart-1: hsl(221 60% 38%);
+  --chart-2: hsl(142 71% 45%);
+  --chart-3: hsl(0 72% 51%);
+  --chart-4: hsl(38 92% 50%);
+  --chart-5: hsl(217 91% 60%);
+
+  --sidebar: hsl(0 0% 100%);
+  --sidebar-foreground: hsl(215 28% 22%);
+  --sidebar-primary: hsl(221 60% 38%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-accent: hsl(220 20% 96%);
+  --sidebar-accent-foreground: hsl(215 28% 22%);
+  --sidebar-border: hsl(220 16% 90%);
+  --sidebar-ring: hsl(221 60% 38%);
+
+  /* Status colors — softer pastel backgrounds with strong text */
+  --status-sold-bg: hsl(142 60% 95%);
+  --status-sold-text: hsl(142 60% 30%);
+  --status-sold-border: hsl(142 50% 70%);
+
+  --status-stock-bg: hsl(38 90% 95%);
+  --status-stock-text: hsl(32 80% 35%);
+  --status-stock-border: hsl(38 80% 70%);
+
+  --status-refusal-bg: hsl(0 70% 96%);
+  --status-refusal-text: hsl(0 70% 40%);
+  --status-refusal-border: hsl(0 60% 75%);
+
+  /* Table specific */
+  --table-row-hover: hsl(220 23% 97%);
+  --table-row-zebra: hsl(220 30% 99%);
+  --table-header-bg: hsl(220 20% 96%);
+  --table-border: hsl(220 16% 92%);
+
+  /* Shadows — softer, more depth */
+  --shadow-sm: 0 1px 2px 0 hsl(220 25% 25% / 0.05);
+  --shadow-md: 0 2px 4px -1px hsl(220 25% 25% / 0.07), 0 1px 3px -1px hsl(220 25% 25% / 0.05);
+  --shadow-lg: 0 4px 12px -2px hsl(220 25% 25% / 0.08), 0 2px 6px -2px hsl(220 25% 25% / 0.05);
 }
 
 @layer base {
@@ -92,37 +120,49 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-size: 13px;
+    font-size: 14px;
+    letter-spacing: -0.011em;
   }
+  /* Better heading hierarchy */
+  h1 { letter-spacing: -0.025em; }
+  h2 { letter-spacing: -0.02em; }
+  h3 { letter-spacing: -0.015em; }
 }
 
-/* CRM specific utilities */
+/* ===========================
+   CRM-specific utilities
+   =========================== */
+
 .crm-header-gradient {
-  background: linear-gradient(135deg, #1e3c72, #2a5298);
+  background: linear-gradient(135deg, hsl(224 56% 25%), hsl(221 60% 38%));
 }
 
 .crm-gradient-calls {
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, hsl(233 80% 67%), hsl(252 56% 50%));
 }
 
 .crm-gradient-visits {
-  background: linear-gradient(135deg, #11998e, #38ef7d);
+  background: linear-gradient(135deg, hsl(168 76% 42%), hsl(145 63% 50%));
 }
 
 .crm-gradient-bank {
-  background: linear-gradient(135deg, #f093fb, #f5576c);
+  background: linear-gradient(135deg, hsl(289 87% 78%), hsl(348 84% 62%));
 }
 
+/* Status colors — softer, with borders */
 .crm-status-sold {
-  background-color: #e8f5e9;
+  background-color: var(--status-sold-bg);
+  border-left: 3px solid var(--status-sold-border);
 }
 
 .crm-status-stock {
-  background-color: #fff8e1;
+  background-color: var(--status-stock-bg);
+  border-left: 3px solid var(--status-stock-border);
 }
 
 .crm-status-refusal {
-  background-color: #ffebee;
+  background-color: var(--status-refusal-bg);
+  border-left: 3px solid var(--status-refusal-border);
 }
 
 /* Tabular numbers for tables */
@@ -135,55 +175,169 @@
   position: sticky;
   top: 0;
   z-index: 10;
-  background: #f1f3f4;
+  background: var(--table-header-bg);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  color: var(--muted-foreground);
+}
+
+/* Zebra striping for data tables */
+.crm-table tbody tr:nth-child(even) {
+  background-color: var(--table-row-zebra);
+}
+
+.crm-table tbody tr:hover {
+  background-color: var(--table-row-hover);
+  transition: background-color 120ms ease;
 }
 
 /* Editable cell focus */
 .crm-editable:focus {
-  outline: 2px solid #2a5298;
-  background: #ffffff;
+  outline: 2px solid var(--primary);
+  background: hsl(0 0% 100%);
   outline-offset: -2px;
+  border-radius: 3px;
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar — softer */
 .crm-scroll::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 .crm-scroll::-webkit-scrollbar-track {
-  background: #f1f3f4;
+  background: hsl(220 20% 97%);
 }
 .crm-scroll::-webkit-scrollbar-thumb {
-  background: #c1c7d0;
-  border-radius: 4px;
+  background: hsl(220 10% 80%);
+  border-radius: 5px;
+  border: 2px solid hsl(220 20% 97%);
 }
 .crm-scroll::-webkit-scrollbar-thumb:hover {
-  background: #95a5a6;
+  background: hsl(220 10% 70%);
 }
 
 /* Calendar grid */
 .crm-calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
+  gap: 6px;
 }
 
 /* Cell with comment */
+.crm-cell-has-comment {
+  position: relative;
+}
 .crm-cell-has-comment::before {
-  content: "💬";
+  content: "";
   position: absolute;
-  top: 1px;
-  left: 2px;
-  font-size: 9px;
+  top: 3px;
+  left: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: hsl(38 92% 50%);
+  box-shadow: 0 0 0 2px hsl(0 0% 100%);
 }
 
 /* Cell with TI link */
 .crm-cell-ti-link {
-  background-color: #e8f0fe !important;
+  background-color: hsl(217 91% 95%) !important;
   cursor: pointer;
+  position: relative;
+}
+.crm-cell-ti-link:hover {
+  background-color: hsl(217 91% 90%) !important;
 }
 .crm-cell-ti-link::after {
   content: "🔗";
-  margin-left: 4px;
-  font-size: 10px;
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 9px;
+}
+
+/* Today highlight in calendar tables */
+.crm-today {
+  background: hsl(38 92% 95%) !important;
+  box-shadow: inset 0 0 0 2px hsl(38 92% 50%);
+}
+
+/* Weekend highlight */
+.crm-weekend {
+  background: hsl(0 60% 99%);
+}
+
+/* Card shadows — softer, modern */
+.crm-card-shadow {
+  box-shadow: var(--shadow-md);
+  transition: box-shadow 200ms ease;
+}
+.crm-card-shadow:hover {
+  box-shadow: var(--shadow-lg);
+}
+
+/* Button transitions */
+.crm-btn {
+  transition: all 150ms ease;
+}
+.crm-btn:hover {
+  transform: translateY(-1px);
+}
+.crm-btn:active {
+  transform: translateY(0);
+}
+
+/* Skeleton shimmer */
+@keyframes crm-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.crm-skeleton {
+  background: linear-gradient(
+    90deg,
+    hsl(220 20% 94%) 0%,
+    hsl(220 20% 98%) 50%,
+    hsl(220 20% 94%) 100%
+  );
+  background-size: 200% 100%;
+  animation: crm-shimmer 1.6s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+/* Fade-in animation for tabs */
+@keyframes crm-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.crm-fade-in {
+  animation: crm-fade-in 200ms ease-out;
+}
+
+/* Empty state illustration pulse */
+@keyframes crm-pulse-soft {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.05); opacity: 0.9; }
+}
+.crm-pulse {
+  animation: crm-pulse-soft 2s ease-in-out infinite;
+}
+
+/* Number colors — softer than pure green/red */
+.crm-num-positive {
+  color: hsl(142 60% 35%);
+}
+.crm-num-negative {
+  color: hsl(0 70% 45%);
+}
+.crm-num-zero {
+  color: var(--muted-foreground);
+}
+
+/* Focus ring for accessibility */
+*:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 4px;
 }

@@ -182,7 +182,7 @@ export function PlanFactTab() {
             📋 План/Факт — {['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][month - 1]} {year}
           </div>
           <div className="overflow-x-auto crm-scroll">
-            <table className="w-full text-[10px] border-collapse">
+            <table className="w-full text-[10px] border-collapse crm-table">
               <thead>
                 <tr className="bg-[#f1f3f4]">
                   <th rowSpan={2} className="border border-[#dadce0] px-2 py-1 sticky left-0 z-10 bg-[#1e3c72] text-white min-w-32">Канал</th>

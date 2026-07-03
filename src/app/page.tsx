@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useCrmStore } from '@/lib/store'
-import { useDebouncedCallback, useDebouncedValue } from '@/hooks/use-debounce'
+import { useDebouncedCallback } from '@/hooks/use-debounce'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Search, Plus, Download, Upload, Printer, Calendar, Keyboard, X } from 'lucide-react'
+import {
+  Search, Plus, Download, Printer, Calendar, Keyboard, X, Car,
+} from 'lucide-react'
 import { SkladTab } from '@/components/crm/sklad-tab'
 import { TrafficTab } from '@/components/crm/traffic-tab'
 import { PlanFactTab } from '@/components/crm/planfact-tab'
@@ -16,9 +18,12 @@ import { HistoryTab } from '@/components/crm/history-tab'
 import { DealFormDialog } from '@/components/crm/deal-form-dialog'
 import { BackupDialog } from '@/components/crm/backup-dialog'
 import {
+  SkladSkeleton, TrafficSkeleton, PlanFactSkeleton,
+  AnalyticsSkeleton, CalendarSkeleton, HistorySkeleton,
+} from '@/components/crm/skeletons'
+import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
-import { toast } from 'sonner'
 import { highlightMatch } from '@/lib/utils-crm'
 import type { TabKey, Deal } from '@/lib/types'
 
@@ -42,10 +47,11 @@ const KEYBOARD_SHORTCUTS = [
 export default function HomePage() {
   const {
     activeTab, setActiveTab,
-    deals, columns, options, channels,
+    deals, columns, options,
     loadDeals, loadColumns, loadOptions, loadChannels, loadStats,
     loadComments, loadEvalLinks, loadHistory,
     stats,
+    loading,
   } = useCrmStore()
 
   const [searchQuery, setSearchQuery] = useState('')
@@ -53,6 +59,7 @@ export default function HomePage() {
   const [backupOpen, setBackupOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [searchFocused, setSearchFocused] = useState(false)
+  const [initialLoading, setInitialLoading] = useState(true)
 
   // Initial load
   useEffect(() => {
@@ -64,9 +71,10 @@ export default function HomePage() {
     loadComments()
     loadEvalLinks()
     loadHistory()
+    const t = setTimeout(() => setInitialLoading(false), 800)
+    return () => clearTimeout(t)
   }, [loadDeals, loadColumns, loadOptions, loadChannels, loadStats, loadComments, loadEvalLinks, loadHistory])
 
-  // Debounced search — only triggers API call for sklad filter; the dropdown uses local filter below
   const debouncedSearch = useDebouncedCallback((q: string) => {
     loadDeals(q ? { search: q } : undefined)
   }, 300)
@@ -76,7 +84,6 @@ export default function HomePage() {
     return d.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
   }, [])
 
-  // Local search results for dropdown (across all deals, no API call needed for dropdown)
   const searchResults = useMemo<Deal[]>(() => {
     if (!searchQuery.trim()) return []
     const q = searchQuery.toLowerCase()
@@ -129,37 +136,41 @@ export default function HomePage() {
     setActiveTab('sklad')
     setSearchQuery('')
     setSearchFocused(false)
-    // Scroll to deal — would need element ref; for now just switch tab
     setTimeout(() => {
       const el = document.querySelector(`[data-deal-id="${dealId}"]`)
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        el.classList.add('ring-2', 'ring-[#1a73e8]')
-        setTimeout(() => el.classList.remove('ring-2', 'ring-[#1a73e8]'), 2000)
+        el.classList.add('ring-2', 'ring-[hsl(217,91%,60%)]')
+        setTimeout(() => el.classList.remove('ring-2', 'ring-[hsl(217,91%,60%)]'), 2000)
       }
     }, 300)
   }
 
+  // Show skeleton on initial load
+  const showSkeleton = initialLoading || loading.deals
+
   return (
     <div className="flex h-screen flex-col overflow-hidden">
-      {/* Header */}
-      <header className="crm-header-gradient text-white px-4 py-2 flex items-center justify-between flex-wrap gap-2 flex-shrink-0">
+      {/* Header — компактнее, с Lucide-иконками */}
+      <header className="crm-header-gradient text-white px-4 py-2 flex items-center justify-between flex-wrap gap-2 flex-shrink-0 shadow-md">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="text-2xl">🚗</div>
+          <div className="w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center backdrop-blur-sm">
+            <Car className="w-5 h-5" />
+          </div>
           <div className="min-w-0">
-            <h1 className="text-base font-semibold truncate">CRM Отдел продаж</h1>
-            <p className="text-[11px] opacity-85 truncate">Управление сделками и аналитика</p>
+            <h1 className="text-base font-semibold truncate leading-tight">CRM Отдел продаж</h1>
+            <p className="text-[11px] opacity-75 truncate leading-tight">Управление сделками и аналитика</p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
           {/* Global search with dropdown */}
           <div className="relative">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/70 pointer-events-none" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/70 pointer-events-none" />
             <Input
               id="global-search"
               type="text"
-              placeholder="Поиск по сделкам..."
+              placeholder="Поиск..."
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value)
@@ -167,25 +178,29 @@ export default function HomePage() {
               }}
               onFocus={() => setSearchFocused(true)}
               onBlur={() => setTimeout(() => setSearchFocused(false), 200)}
-              className="pl-7 h-8 w-56 bg-white/15 border-white/20 text-white placeholder:text-white/70 focus:bg-white/25"
+              className="pl-8 pr-7 h-8 w-56 bg-white/10 border-white/15 text-white placeholder:text-white/60 focus:bg-white/20 focus:border-white/30 transition-all"
             />
             {searchQuery && (
               <button
                 onClick={() => { setSearchQuery(''); debouncedSearch('') }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-white/70 hover:text-white"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-white/60 hover:text-white transition-colors"
+                aria-label="Очистить поиск"
               >
-                <X className="w-3 h-3" />
+                <X className="w-3.5 h-3.5" />
               </button>
             )}
 
             {/* Search results dropdown */}
             {searchFocused && searchQuery.trim() && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-white text-[#2c3e50] rounded-md shadow-lg max-h-80 overflow-y-auto z-50 border border-[#e0e0e0]">
+              <div className="absolute top-full left-0 right-0 mt-1.5 bg-white text-[hsl(215,28%,22%)] rounded-lg shadow-xl max-h-80 overflow-y-auto z-50 border border-[hsl(220,16%,90%)] crm-scroll">
                 {searchResults.length === 0 ? (
-                  <div className="px-3 py-4 text-xs text-[#7f8c8d] text-center">Ничего не найдено</div>
+                  <div className="px-4 py-6 text-xs text-[hsl(215,16%,47%)] text-center">
+                    <Search className="w-5 h-5 mx-auto mb-2 opacity-40" />
+                    Ничего не найдено по запросу «{searchQuery}»
+                  </div>
                 ) : (
                   <>
-                    <div className="px-3 py-1 text-[10px] text-[#7f8c8d] border-b bg-[#f8f9fa]">
+                    <div className="px-3 py-1.5 text-[10px] uppercase tracking-wide text-[hsl(215,16%,47%)] border-b bg-[hsl(220,23%,98%)] font-semibold">
                       Найдено: {searchResults.length}{searchResults.length === 10 ? '+' : ''}
                     </div>
                     {searchResults.map((d) => (
@@ -193,20 +208,18 @@ export default function HomePage() {
                         key={d.id}
                         data-deal-id={d.id}
                         onMouseDown={() => goToDeal(d.id)}
-                        className="w-full text-left px-3 py-1.5 hover:bg-[#f0f2f5] border-b last:border-b-0 flex items-center justify-between gap-2"
+                        className="w-full text-left px-3 py-2 hover:bg-[hsl(220,23%,97%)] border-b last:border-b-0 flex items-center justify-between gap-2 transition-colors"
                       >
                         <div className="flex-1 min-w-0">
                           <div className="text-xs font-medium truncate">
                             <HighlightedText text={d.model} query={searchQuery} /> —{' '}
                             <HighlightedText text={d.client || 'без клиента'} query={searchQuery} />
                           </div>
-                          <div className="text-[10px] text-[#7f8c8d]">
+                          <div className="text-[10px] text-[hsl(215,16%,47%)] mt-0.5">
                             {d.seller} • {d.dateDkp || '—'}
                           </div>
                         </div>
-                        <Badge variant="outline" className="text-[10px] flex-shrink-0">
-                          {d.status}
-                        </Badge>
+                        <StatusBadge status={d.status} />
                       </button>
                     ))}
                   </>
@@ -215,50 +228,57 @@ export default function HomePage() {
             )}
           </div>
 
-          <Button size="sm" variant="secondary"
+          {/* Primary action */}
+          <Button
+            size="sm"
             onClick={() => setDealFormOpen(true)}
-            className="bg-white text-[#2a5298] hover:bg-white/90 h-8"
+            className="bg-white text-[hsl(221,60%,38%)] hover:bg-white/90 h-8 shadow-sm crm-btn font-medium"
           >
             <Plus className="w-3.5 h-3.5 mr-1" /> Сделка
           </Button>
 
-          <Button size="sm" variant="secondary"
-            onClick={handleBackup}
-            className="bg-white/15 text-white border-white/20 hover:bg-white/25 h-8"
-          >
-            <Download className="w-3.5 h-3.5 mr-1" /> Бэкап
-          </Button>
+          {/* Secondary actions */}
+          <div className="flex items-center gap-1 bg-white/10 rounded-md p-0.5 border border-white/10">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleBackup}
+              className="text-white hover:bg-white/15 h-7 px-2 crm-btn"
+              title="Бэкап (Ctrl+S)"
+            >
+              <Download className="w-3.5 h-3.5" />
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShortcutsOpen(true)}
+              className="text-white hover:bg-white/15 h-7 px-2 crm-btn"
+              title="Горячие клавиши (?)"
+            >
+              <Keyboard className="w-3.5 h-3.5" />
+            </Button>
+          </div>
 
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setShortcutsOpen(true)}
-            className="text-white hover:bg-white/15 h-8 w-8 p-0"
-            title="Горячие клавиши (?)"
-          >
-            <Keyboard className="w-4 h-4" />
-          </Button>
-
-          <div className="text-[11px] opacity-85 hidden md:block">
-            <Calendar className="w-3 h-3 inline mr-1" />
+          <div className="text-[11px] opacity-75 hidden lg:flex items-center gap-1 pl-2 border-l border-white/15">
+            <Calendar className="w-3 h-3" />
             {todayStr}
           </div>
         </div>
       </header>
 
       {/* Tabs */}
-      <nav className="bg-white px-3 flex gap-1 border-b-2 border-[#e0e0e0] flex-shrink-0 overflow-x-auto">
+      <nav className="bg-white px-3 flex gap-1 border-b border-[hsl(220,16%,90%)] flex-shrink-0 overflow-x-auto shadow-sm">
         {TABS.map((t) => (
           <button
             key={t.key}
             onClick={() => setActiveTab(t.key)}
-            className={`px-3.5 py-2 text-xs font-medium whitespace-nowrap border-b-[3px] -mb-[2px] transition-colors ${
+            className={`px-4 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 -mb-px transition-all flex items-center gap-1.5 ${
               activeTab === t.key
-                ? 'text-[#2a5298] border-[#2a5298] font-semibold'
-                : 'text-[#7f8c8d] border-transparent hover:text-[#2a5298] hover:bg-[#f8f9fa]'
+                ? 'text-[hsl(221,60%,38%)] border-[hsl(221,60%,38%)] font-semibold'
+                : 'text-[hsl(215,16%,47%)] border-transparent hover:text-[hsl(221,60%,38%)] hover:bg-[hsl(220,23%,98%)]'
             }`}
           >
-            <span className="mr-1">{t.icon}</span>
+            <span className="text-sm">{t.icon}</span>
             {t.label}
           </button>
         ))}
@@ -266,28 +286,31 @@ export default function HomePage() {
 
       {/* Stats bar (only on sklad tab) */}
       {activeTab === 'sklad' && stats && (
-        <div className="bg-white border-b px-4 py-2 flex items-center gap-4 text-xs flex-shrink-0 flex-wrap">
-          <Badge variant="secondary" className="bg-[#e8f0fe] text-[#1a73e8]">Всего: {stats.total}</Badge>
-          <Badge className="bg-[#28a745] hover:bg-[#28a745]">Продан: {stats.sold}</Badge>
-          <Badge className="bg-[#ffc107] hover:bg-[#ffc107] text-black">Склад: {stats.inStock}</Badge>
-          <Badge className="bg-[#dc3545] hover:bg-[#dc3545]">Отказ: {stats.refused}</Badge>
-          <Badge variant="outline">Σ ЖОК: {new Intl.NumberFormat('ru-RU').format(stats.sumJok)} ₽</Badge>
-          <Badge variant="outline">Σ К: {new Intl.NumberFormat('ru-RU').format(stats.sumK)} ₽</Badge>
-          <Badge variant="outline">ТИ: {stats.tiCount}</Badge>
-          <Badge variant="outline">КР: {stats.krCount}</Badge>
+        <div className="bg-white border-b border-[hsl(220,16%,90%)] px-4 py-2 flex items-center gap-2 text-xs flex-shrink-0 flex-wrap">
+          <StatBadge label="Всего" value={stats.total} variant="neutral" />
+          <StatBadge label="Продан" value={stats.sold} variant="success" />
+          <StatBadge label="Склад" value={stats.inStock} variant="warning" />
+          <StatBadge label="Отказ" value={stats.refused} variant="danger" />
+          <div className="w-px h-4 bg-[hsl(220,16%,90%)] mx-1" />
+          <StatBadge label="Σ ЖОК" value={`${new Intl.NumberFormat('ru-RU').format(stats.sumJok)} ₽`} variant="info" />
+          <StatBadge label="Σ К" value={`${new Intl.NumberFormat('ru-RU').format(stats.sumK)} ₽`} variant="info" />
+          <StatBadge label="ТИ" value={stats.tiCount} variant="info" />
+          <StatBadge label="КР" value={stats.krCount} variant="info" />
         </div>
       )}
 
-      {/* Tab content */}
-      <main className="flex-1 overflow-hidden bg-[#f0f2f5]">
-        {activeTab === 'sklad' && (
-          <SkladTab deals={deals} columns={columns} options={options} />
-        )}
-        {activeTab === 'traffic' && <TrafficTab />}
-        {activeTab === 'planfact' && <PlanFactTab />}
-        {activeTab === 'analytics' && <AnalyticsTab />}
-        {activeTab === 'calendar' && <CalendarTab />}
-        {activeTab === 'history' && <HistoryTab />}
+      {/* Tab content with skeletons */}
+      <main className="flex-1 overflow-hidden bg-[hsl(220,23%,96%)]">
+        <div key={activeTab} className="crm-fade-in h-full">
+          {activeTab === 'sklad' && (showSkeleton
+            ? <SkladSkeleton />
+            : <SkladTab deals={deals} columns={columns} options={options} />)}
+          {activeTab === 'traffic' && <TrafficTab />}
+          {activeTab === 'planfact' && <PlanFactTab />}
+          {activeTab === 'analytics' && <AnalyticsTab />}
+          {activeTab === 'calendar' && <CalendarTab />}
+          {activeTab === 'history' && <HistoryTab />}
+        </div>
       </main>
 
       {/* Modals */}
@@ -298,13 +321,16 @@ export default function HomePage() {
       <Dialog open={shortcutsOpen} onOpenChange={setShortcutsOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>⌨️ Горячие клавиши</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Keyboard className="w-4 h-4" />
+              Горячие клавиши
+            </DialogTitle>
           </DialogHeader>
-          <div className="space-y-2 py-2">
+          <div className="space-y-1 py-2">
             {KEYBOARD_SHORTCUTS.map((s) => (
-              <div key={s.key} className="flex items-center justify-between text-xs py-1 border-b last:border-b-0">
-                <span className="text-[#7f8c8d]">{s.desc}</span>
-                <kbd className="px-2 py-1 bg-[#f1f3f4] rounded text-[10px] font-mono border border-[#dadce0]">{s.key}</kbd>
+              <div key={s.key} className="flex items-center justify-between text-sm py-2 border-b last:border-b-0">
+                <span className="text-[hsl(215,16%,47%)]">{s.desc}</span>
+                <kbd className="px-2 py-1 bg-[hsl(220,20%,95%)] rounded text-[11px] font-mono border border-[hsl(220,16%,90%)] shadow-sm">{s.key}</kbd>
               </div>
             ))}
           </div>
@@ -320,10 +346,41 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
   return (
     <>
       {chunks.map((c, i) => (
-        <span key={i} className={c.isMatch ? 'bg-[#fff3cd] font-semibold' : ''}>
+        <span key={i} className={c.isMatch ? 'bg-[hsl(38,92%,90%)] font-semibold rounded px-0.5' : ''}>
           {c.text}
         </span>
       ))}
     </>
+  )
+}
+
+// Status badge component
+function StatusBadge({ status }: { status: string }) {
+  const styles: Record<string, string> = {
+    'Продан': 'bg-[hsl(142,60%,95%)] text-[hsl(142,60%,30%)] border-[hsl(142,50%,70%)]',
+    'Склад': 'bg-[hsl(38,90%,95%)] text-[hsl(32,80%,35%)] border-[hsl(38,80%,70%)]',
+    'Отказ': 'bg-[hsl(0,70%,96%)] text-[hsl(0,70%,40%)] border-[hsl(0,60%,75%)]',
+  }
+  return (
+    <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${styles[status] || 'bg-gray-100 text-gray-700 border-gray-300'}`}>
+      {status}
+    </span>
+  )
+}
+
+// Stat badge component
+function StatBadge({ label, value, variant }: { label: string; value: string | number; variant: 'neutral' | 'success' | 'warning' | 'danger' | 'info' }) {
+  const styles = {
+    neutral: 'bg-[hsl(220,20%,95%)] text-[hsl(215,28%,22%)]',
+    success: 'bg-[hsl(142,60%,95%)] text-[hsl(142,60%,30%)]',
+    warning: 'bg-[hsl(38,90%,95%)] text-[hsl(32,80%,35%)]',
+    danger: 'bg-[hsl(0,70%,96%)] text-[hsl(0,70%,40%)]',
+    info: 'bg-[hsl(217,91%,95%)] text-[hsl(221,60%,35%)]',
+  }
+  return (
+    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium ${styles[variant]}`}>
+      <span className="opacity-70">{label}:</span>
+      <span className="font-semibold tabular-nums">{value}</span>
+    </div>
   )
 }

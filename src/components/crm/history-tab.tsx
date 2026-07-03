@@ -80,9 +80,16 @@ export function HistoryTab() {
       <div className="flex-1 overflow-auto crm-scroll p-3">
         <Card className="divide-y">
           {filtered.length === 0 ? (
-            <div className="text-center py-12 text-[#7f8c8d]">
-              <div className="text-4xl mb-2">📜</div>
-              <div className="text-sm">История пуста</div>
+            <div className="text-center py-16 text-[hsl(215,16%,47%)] crm-fade-in">
+              <div className="w-16 h-16 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-[hsl(220,20%,95%)] to-[hsl(220,20%,98%)] flex items-center justify-center">
+                <span className="text-3xl">📜</span>
+              </div>
+              <div className="text-sm font-medium mb-1">
+                {filter ? 'Записей нет по выбранному фильтру' : 'История пуста'}
+              </div>
+              <div className="text-xs text-[hsl(215,16%,60%)]">
+                {filter ? 'Попробуйте выбрать другой тип событий' : 'Все ваши действия будут отображаться здесь'}
+              </div>
             </div>
           ) : (
             filtered.map((h) => {

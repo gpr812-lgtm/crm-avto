@@ -24,11 +24,24 @@ export default function RootLayout({
   return (
     <html lang="ru" suppressHydrationWarning>
       <body
-        className={`${inter.variable} font-sans antialiased bg-[#f0f2f5] text-[#2c3e50]`}
+        className={`${inter.variable} font-sans antialiased bg-[hsl(220,23%,96%)] text-[hsl(215,28%,22%)]`}
       >
         {children}
         <Toaster />
-        <SonnerToaster position="bottom-right" richColors closeButton />
+        <SonnerToaster
+          position="bottom-right"
+          richColors
+          closeButton
+          duration={4000}
+          toastOptions={{
+            duration: 4000,
+            classNames: {
+              error: 'duration-7000',
+              success: 'duration-4000',
+              warning: 'duration-6000',
+            },
+          }}
+        />
       </body>
     </html>
   );

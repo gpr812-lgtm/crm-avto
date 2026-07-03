@@ -112,16 +112,16 @@ export function AnalyticsTab() {
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        <KpiCard label="Всего АМ" value={formatNumber(totals.count)} color="#2a5298" />
-        <KpiCard label="Общий ЖОК" value={`${formatNumber(totals.jok)} ₽`} color="#28a745" />
-        <KpiCard label="ТИ" value={formatNumber(totals.ti)} color="#1a73e8" />
-        <KpiCard label="КР" value={formatNumber(totals.kr)} color="#ffc107" />
+        <KpiCard label="Всего АМ" value={formatNumber(totals.count)} color="hsl(221,60%,38%)" />
+        <KpiCard label="Общий ЖОК" value={`${formatNumber(totals.jok)} ₽`} color="hsl(142,60%,35%)" />
+        <KpiCard label="ТИ" value={formatNumber(totals.ti)} color="hsl(217,91%,55%)" />
+        <KpiCard label="КР" value={formatNumber(totals.kr)} color="hsl(38,90%,45%)" />
       </div>
 
       {/* Analytics table */}
       <Card className="overflow-hidden">
         <div className="overflow-x-auto crm-scroll">
-          <table className="w-full text-xs border-collapse">
+          <table className="w-full text-xs border-collapse crm-table">
             <thead>
               <tr className="bg-[#f1f3f4]">
                 <th rowSpan={2} className="border border-[#dadce0] px-2 py-1 sticky left-0 bg-[#1e3c72] text-white min-w-40">
@@ -204,9 +204,9 @@ export function AnalyticsTab() {
 
 function KpiCard({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <Card className="p-3 flex flex-col gap-1">
-      <div className="text-[10px] text-[#7f8c8d] uppercase tracking-wide">{label}</div>
-      <div className="text-lg font-bold" style={{ color }}>{value}</div>
+    <Card className="p-4 flex flex-col gap-1.5 crm-card-shadow border-[hsl(220,16%,90%)]">
+      <div className="text-[10px] text-[hsl(215,16%,47%)] uppercase tracking-wide font-medium">{label}</div>
+      <div className="text-xl font-bold tabular-nums" style={{ color }}>{value}</div>
     </Card>
   )
 }

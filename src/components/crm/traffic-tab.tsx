@@ -394,7 +394,7 @@ function TrafficTable({
     <div className="bg-white rounded border border-[#e0e0e0] overflow-hidden">
       <div className={`${gradient} text-white px-3 py-1.5 text-xs font-semibold`}>{title}</div>
       <div className="overflow-x-auto crm-scroll">
-        <table className="w-full text-[11px] border-collapse">
+        <table className="w-full text-[11px] border-collapse crm-table">
           <thead>
             <tr className="bg-[#f1f3f4]">
               <th className="border border-[#dadce0] px-2 py-1 sticky left-0 z-10 bg-[#f1f3f4] min-w-32">Модель</th>
@@ -562,7 +562,7 @@ function BankTable({
     <div className="bg-white rounded border border-[#e0e0e0] overflow-hidden">
       <div className="crm-gradient-bank text-white px-3 py-1.5 text-xs font-semibold">💼 Общий банк контрактов</div>
       <div className="overflow-x-auto crm-scroll">
-        <table className="w-full text-[11px] border-collapse">
+        <table className="w-full text-[11px] border-collapse crm-table">
           <thead>
             <tr className="bg-[#f1f3f4]">
               <th className="border border-[#dadce0] px-2 py-1 sticky left-0 bg-[#f1f3f4] min-w-32">Показатель</th>
@@ -642,7 +642,7 @@ function WeeklySummary({
   return (
     <Card className="overflow-hidden">
       <div className={`${gradient} text-white px-3 py-1.5 text-xs font-semibold`}>{title}</div>
-      <table className="w-full text-[11px] border-collapse">
+      <table className="w-full text-[11px] border-collapse crm-table">
         <thead>
           <tr className="bg-[#f1f3f4]">
             <th className="border border-[#dadce0] px-2 py-1">Неделя</th>

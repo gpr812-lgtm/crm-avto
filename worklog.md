@@ -98,3 +98,34 @@ Stage Summary:
 - 3 новых API endpoints (deals/import, columns POST, columns/[id] PATCH+DELETE)
 - 4 новых утилиты (forecast, weeks, highlight, contractsByDate)
 - Скриншоты: /home/z/my-project/download/crm-v2-*.png
+
+---
+Task ID: polish-1
+Agent: main (Super Z)
+Task: Вариант A — Полировка UI
+
+Work Log:
+- Скриншоты «до» для 6 вкладок (before-*.png)
+- Полностью переписан globals.css: HSL-палитра вместо Bootstrap-цветов, базовый шрифт 14px, мягкие тени (sm/md/lg), CSS-переменные для статусов сделок, zebra-striping, плавные переходы, fade-in анимация, skeleton shimmer, focus-visible для a11y
+- Создан skeletons.tsx с 6 скелетонами (SkladSkeleton, TrafficSkeleton, PlanFactSkeleton, AnalyticsSkeleton, CalendarSkeleton, HistorySkeleton) — показываются при загрузке вместо белого экрана
+- Обновлён layout.tsx: Sonner с richColors, closeButton, duration=4с (errors=7с, warnings=6с)
+- Переписан page.tsx: иконка Car в логотипе (Lucide вместо эмодзи), группировка secondary-кнопок в одну панель, StatusBadge и StatBadge как переиспользуемые компоненты, fade-in анимация при смене вкладок, улучшенный dropdown поиска с иконкой «ничего не найдено», скелетоны при initialLoading
+- Добавлен класс crm-table ко всем таблицам (sklad, traffic, planfact, analytics) — zebra-striping + hover + uppercase headers
+- Empty state в sklad-tab: иконка с pulse-анимацией, 2 кнопки CTA, лучший текст
+- Empty state в history-tab: зависимость от filter, подсказки
+- KPI-карточки в analytics: тени crm-card-shadow, увеличенный размер, tabular-nums
+- Цвета KPI обновлены на HSL-палитру
+- ESLint: 0 ошибок
+- Скриншоты «после» для 6 вкладок + search + shortcuts (after-*.png)
+
+Stage Summary:
+- Применена современная HSL-палитра (shadcn-style)
+- Zebra-striping + hover-эффекты во всех таблицах
+- 6 типов скелетонов при загрузке
+- Toast с кнопкой закрытия и longer duration для ошибок
+- Lucide-иконки в шапке (Car, Search, Plus, Download, Keyboard, Calendar, X)
+- Компактная шапка с группировкой кнопок
+- Empty states с CTA-кнопками и иконками-иллюстрациями
+- Сглаженные тени на карточках
+- Анимация fade-in при смене вкладок
+- Функционал НЕ затронут — только CSS/visual changes

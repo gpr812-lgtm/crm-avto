@@ -410,15 +410,23 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
   if (deals.length === 0) {
     return (
       <div className="h-full flex items-center justify-center p-8">
-        <div className="text-center max-w-md">
-          <div className="text-5xl mb-3">📦</div>
-          <h2 className="text-lg font-semibold mb-2">Список сделок пуст</h2>
-          <p className="text-sm text-[#7f8c8d] mb-4">
-            Нажмите «Сделка» в шапке, чтобы добавить запись, или импортируйте CSV.
+        <div className="text-center max-w-md crm-fade-in">
+          <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-[hsl(221,60%,95%)] to-[hsl(217,91%,95%)] flex items-center justify-center crm-pulse">
+            <span className="text-4xl">📦</span>
+          </div>
+          <h2 className="text-lg font-semibold mb-2 text-[hsl(215,28%,22%)]">Список сделок пуст</h2>
+          <p className="text-sm text-[hsl(215,16%,47%)] mb-5 leading-relaxed">
+            Добавьте первую сделку вручную или импортируйте готовый CSV-файл,
+            чтобы начать работу с CRM.
           </p>
-          <Button onClick={() => csvFileRef.current?.click()} variant="outline" size="sm">
-            <Upload className="w-3.5 h-3.5 mr-1" /> Импорт CSV
-          </Button>
+          <div className="flex items-center gap-2 justify-center">
+            <Button onClick={() => useCrmStore.getState().setActiveTab('sklad')} size="sm" className="bg-[hsl(221,60%,38%)] hover:bg-[hsl(221,60%,33%)]">
+              <Plus className="w-3.5 h-3.5 mr-1" /> Добавить сделку
+            </Button>
+            <Button onClick={() => csvFileRef.current?.click()} variant="outline" size="sm">
+              <Upload className="w-3.5 h-3.5 mr-1" /> Импорт CSV
+            </Button>
+          </div>
           <input ref={csvFileRef} type="file" accept=".csv" onChange={handleImportCSVFile} className="hidden" />
         </div>
       </div>
@@ -515,7 +523,7 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
 
       {/* Table */}
       <div className="flex-1 overflow-auto crm-scroll">
-        <table className="w-full border-collapse text-xs">
+        <table className="w-full border-collapse text-xs crm-table">
           <thead>
             <tr className="bg-[#f1f3f4]">
               <th className="border border-[#dadce0] px-2 py-1.5 w-8 sticky left-0 z-20 bg-[#f1f3f4]">
