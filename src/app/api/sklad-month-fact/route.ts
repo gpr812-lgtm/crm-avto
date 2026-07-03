@@ -18,25 +18,26 @@ export async function GET(req: NextRequest) {
     const month = url.searchParams.get('month')
     if (!month) return NextResponse.json({ error: 'month required' }, { status: 400 })
 
-    // All deals with dateDkp in this month (for contracts count)
+    // Contracts = all deals with dateDkp in month, EXCLUDING Отказ/Призрак
+    // (Продан + Склад count as contracts; Отказ/Призрак don't)
     const contractDeals = await db.deal.findMany({
       where: {
         dateDkp: { startsWith: month },
-        status: 'Продан',
+        status: { notIn: ['Отказ', 'Призрак'] },
       },
     })
 
-    // All deals with dateIssued in this month (for issued count)
+    // Issued = all deals with dateIssued in month, EXCLUDING Отказ/Призрак
     const issuedDeals = await db.deal.findMany({
       where: {
         dateIssued: { startsWith: month },
-        status: 'Продан',
+        status: { notIn: ['Отказ', 'Призрак'] },
       },
     })
 
-    // Financial sums — exclude Отказ/Призрак/РИСК4
+    // Financial sums — also exclude РИСК4
     const financialDeals = contractDeals.filter(
-      (d) => d.status !== 'Отказ' && d.status !== 'Призрак' && d.risk !== '4',
+      (d) => d.risk !== '4',
     )
 
     const sum = (arr: typeof financialDeals, key: 'j' | 'o' | 'k' | 'jok') =>

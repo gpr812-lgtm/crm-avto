@@ -292,11 +292,6 @@ export default function HomePage() {
           <StatBadge label="Склад" value={stats.inStock} variant="warning" />
           <StatBadge label="Призраки" value={stats.ghost} variant="ghost" />
           <StatBadge label="Отказ" value={stats.refused} variant="danger" />
-          <div className="w-px h-4 bg-[hsl(220,16%,90%)] mx-1" />
-          <StatBadge label="Σ ЖОК" value={`${new Intl.NumberFormat('ru-RU').format(stats.sumJok)} ₽`} variant="info" />
-          <StatBadge label="Σ К" value={`${new Intl.NumberFormat('ru-RU').format(stats.sumK)} ₽`} variant="info" />
-          <StatBadge label="ТИ" value={stats.tiCount} variant="info" />
-          <StatBadge label="КР" value={stats.krCount} variant="info" />
         </div>
       )}
 

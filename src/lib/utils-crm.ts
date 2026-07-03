@@ -184,9 +184,9 @@ export function calculateForecast(
   const now = new Date()
   const isCurrentMonth = now.getFullYear() === y && now.getMonth() + 1 === m
 
-  // All sold contracts in this month
+  // All contracts in this month — exclude Отказ/Призрак (Продан + Склад count)
   const monthContracts = deals.filter(
-    (d) => d.status === 'Продан' && d.dateDkp && d.dateDkp.startsWith(monthKey),
+    (d) => d.status !== 'Отказ' && d.status !== 'Призрак' && d.dateDkp && d.dateDkp.startsWith(monthKey),
   )
   const daysPassed = isCurrentMonth ? now.getDate() : dim
   const contractsSoFar = monthContracts.filter((d) => {
@@ -201,7 +201,7 @@ export function calculateForecast(
   const planTotal = Object.values(todayPlans).reduce((s, p) => s + (p.contracts || 0), 0)
 
   const prevContracts = prevMonthDeals.filter(
-    (d) => d.status === 'Продан' && d.dateDkp && d.dateDkp.startsWith(prevMonthKey),
+    (d) => d.status !== 'Отказ' && d.status !== 'Призрак' && d.dateDkp && d.dateDkp.startsWith(prevMonthKey),
   ).length
   const trendPct = prevContracts > 0 ? (contractsSoFar / prevContracts - 1) * 100 : null
 
@@ -226,10 +226,13 @@ export function getContractsByDate(
 ): Record<number, { calls: number; visits: number; all: number }> {
   const out: Record<number, { calls: number; visits: number; all: number }> = {}
   for (const d of deals) {
-    if (d.status !== 'Продан' || !d.dateDkp || !d.dateDkp.startsWith(monthKey)) continue
+    // Exclude Отказ and Призрак — all other statuses (Продан, Склад) count as contracts
+    if (d.status === 'Отказ' || d.status === 'Призрак') continue
+    if (!d.dateDkp || !d.dateDkp.startsWith(monthKey)) continue
     const day = Number(d.dateDkp.slice(8, 10))
     if (!out[day]) out[day] = { calls: 0, visits: 0, all: 0 }
     const traffic = d.traffic || ''
+    // "calls" = Звонок + Заявка (Заявка counts as call-type traffic)
     if (traffic.includes('Звонок') || traffic.includes('Заявка')) {
       out[day].calls++
     }

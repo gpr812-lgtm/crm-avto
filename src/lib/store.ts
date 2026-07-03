@@ -125,6 +125,8 @@ export const useCrmStore = create<CrmState>((set, get) => ({
         deals: s.deals.map((d) => (d.id === id ? deal : d)),
       }))
       get().loadHistory()
+      // Refresh stats so KPI in header updates instantly
+      get().loadStats()
     } catch (e) {
       // Revert on error
       console.error('editDeal failed:', e)

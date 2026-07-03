@@ -641,11 +641,35 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
           <tfoot>
             <tr className="bg-[#e8f0fe] font-bold sticky bottom-0">
               <td colSpan={2} className="border border-[#dadce0] px-2 py-1.5 text-right">Σ</td>
-              {columns.map((col) => (
-                <td key={col.key} className="border border-[#dadce0] px-2 py-1.5 text-center tabular-nums">
-                  {col.type === 'number' ? formatNumber(totals[col.key] ?? 0) : ''}
-                </td>
-              ))}
+              {columns.map((col) => {
+                // Number columns: show sum (excluding Отказ/Призрак/РИСК4 for j/o/k/jok/ti/kr)
+                if (col.type === 'number') {
+                  return (
+                    <td key={col.key} className="border border-[#dadce0] px-2 py-1.5 text-center tabular-nums">
+                      {formatNumber(totals[col.key] ?? 0)}
+                    </td>
+                  )
+                }
+                // Count КР = deals with kr='1' (excluding Отказ/Призрак/РИСК4)
+                if (col.key === 'kr') {
+                  const krCount = filteredDeals.filter((d) => !isDealExcludedFromTotals(d) && d.kr === '1').length
+                  return (
+                    <td key={col.key} className="border border-[#dadce0] px-2 py-1.5 text-center tabular-nums bg-[hsl(217,91%,92%)]" title={`Сделок с КР=1: ${krCount} (исключая Отказ/Призрак/РИСК4)`}>
+                      {krCount}
+                    </td>
+                  )
+                }
+                // Count ТИ = deals with ti in [1,2] (excluding Отказ/Призрак/РИСК4)
+                if (col.key === 'ti') {
+                  const tiCount = filteredDeals.filter((d) => !isDealExcludedFromTotals(d) && (d.ti === '1' || d.ti === '2')).length
+                  return (
+                    <td key={col.key} className="border border-[#dadce0] px-2 py-1.5 text-center tabular-nums bg-[hsl(217,91%,92%)]" title={`Сделок с ТИ=1/2: ${tiCount} (исключая Отказ/Призрак/РИСК4)`}>
+                      {tiCount}
+                    </td>
+                  )
+                }
+                return <td key={col.key} className="border border-[#dadce0] px-2 py-1.5"></td>
+              })}
             </tr>
           </tfoot>
         </table>
