@@ -1,0 +1,221 @@
+// CRM "Отдел продаж" — Prisma schema
+// SQLite для разработки, легко мигрировать на PostgreSQL для production
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================
+// Справочники (select options)
+// ============================
+
+model SelectOption {
+  id        Int      @id @default(autoincrement())
+  dictName  String   // 'model' | 'status' | 'seller' | 'review' | 'traffic' | 'risk' | 'kr' | 'ti' | 'custom_*'
+  value     String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@unique([dictName, value])
+  @@index([dictName])
+}
+
+// ============================
+// Склад (главная таблица сделок)
+// ============================
+
+model Deal {
+  id         String   @id @default(cuid())
+  model      String   @default("Tenet T7")
+  status     String   @default("Продан") // 'Продан' | 'Склад' | 'Отказ'
+  dateDkp    String?  // YYYY-MM-DD
+  dateIssued String?  // YYYY-MM-DD
+  seller     String?
+  client     String?
+  jok        Float    @default(0)
+  j          Float    @default(0)
+  o          Float    @default(0)
+  k          Float    @default(0)
+  risk       String   @default("1") // '1'..'5'
+  kr         String   @default("0") // '0' | '1'
+  ti         String   @default("0") // '0' | '1' | '2'
+  review     String   @default("Нет отзыва")
+  traffic    String   @default("🚶 Визит")
+  comment    String?
+  order      Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  evaluationLink EvaluationLink?
+
+  @@index([status])
+  @@index([model])
+  @@index([seller])
+  @@index([dateDkp])
+  @@index([dateIssued])
+}
+
+// Колонки таблицы Склад (custom columns)
+model DealColumn {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  label     String
+  type      String   @default("text") // 'text' | 'number' | 'date' | 'url' | 'select'
+  options   String?  // dictName для select
+  default   String?
+  width     Int      @default(100)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================
+// Трафик (звонки / визиты по дням и моделям)
+// ============================
+
+model TrafficEntry {
+  id        Int      @id @default(autoincrement())
+  monthKey  String   // YYYY-MM
+  model     String
+  type      String   // 'callsAndApps' | 'visits'
+  day       Int      // 1..31
+  value     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([monthKey, model, type, day])
+  @@index([monthKey, model])
+  @@index([monthKey, type])
+}
+
+// Планы на день (встречи / контракты)
+model TodayPlan {
+  id        Int      @id @default(autoincrement())
+  monthKey  String   // YYYY-MM
+  day       Int      // 1..31
+  meetings  Int      @default(0)
+  contracts Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([monthKey, day])
+}
+
+// Комментарии к ячейкам трафика
+model CellComment {
+  id        Int      @id @default(autoincrement())
+  table     String   // 'calls' | 'visits'
+  day       Int      // 1..31
+  model     String
+  text      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([table, day, model])
+}
+
+// ============================
+// Каналы трафика и План/Факт
+// ============================
+
+model Channel {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  group     String   // 'Digital' | 'Классифайды' | ...
+  budget    Float    @default(0)
+  cpl       Float    @default(0)
+  rl        Float    @default(0)
+  sr        Float    @default(0)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([group])
+}
+
+// План по каналам (по месяцам и дням)
+model PlanEntry {
+  id        Int      @id @default(autoincrement())
+  monthKey  String   // YYYY-MM
+  channel   String
+  day       Int      // 1..31
+  leads     Int      @default(0)
+  budget    Float    @default(0)
+  cpl       Float    @default(0)
+  rl        Float    @default(0)
+  sr        Float    @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([monthKey, channel, day])
+  @@index([monthKey, channel])
+}
+
+// Факт по месяцам (общий на месяц)
+model FactEntry {
+  id         Int      @id @default(autoincrement())
+  monthKey   String   @unique // YYYY-MM
+  contracts  Int      @default(0)
+  issued     Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// ============================
+// Ссылки ТИ и архив
+// ============================
+
+model EvaluationLink {
+  id        Int      @id @default(autoincrement())
+  dealId    String   @unique
+  url       String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+}
+
+model LinksArchive {
+  id        Int      @id @default(autoincrement())
+  dealId    String
+  url       String
+  model     String?
+  client    String?
+  deletedAt DateTime @default(now())
+
+  @@index([dealId])
+}
+
+// ============================
+// История изменений
+// ============================
+
+model ChangeHistory {
+  id          Int      @id @default(autoincrement())
+  type        String   // 'add' | 'edit' | 'delete' | 'bulk'
+  description String
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// ============================
+// Настройки
+// ============================
+
+model Setting {
+  id    Int    @id @default(autoincrement())
+  key   String @unique
+  value String
+}
+
+model BackupTime {
+  id        Int      @id @default(1)
+  time      DateTime
+  updatedAt DateTime @updatedAt
+}
