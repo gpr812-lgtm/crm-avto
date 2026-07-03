@@ -1,0 +1,2983 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRM Отдел продаж</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f0f2f5; color: #2c3e50; height: 100vh; display: flex; flex-direction: column; overflow: hidden; font-size: 12px; }
+    
+    .app-header { background: linear-gradient(135deg, #1e3c72, #2a5298); color: white; padding: 8px 20px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; flex-wrap: wrap; gap: 10px; }
+    .app-header h1 { font-size: 16px; font-weight: 600; }
+    .app-header p { font-size: 11px; opacity: 0.85; margin-top: 1px; }
+    .app-header .right-section { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    
+    .global-search { display: flex; align-items: center; background: rgba(255,255,255,0.15); border-radius: 6px; padding: 4px 10px; min-width: 220px; position: relative; }
+    .global-search input { background: transparent; border: none; color: white; outline: none; font-size: 12px; width: 100%; }
+    .global-search input::placeholder { color: rgba(255,255,255,0.7); }
+    .global-search-results { position: absolute; top: 100%; left: 0; right: 0; background: white; color: #2c3e50; border-radius: 0 0 6px 6px; max-height: 300px; overflow-y: auto; z-index: 2000; box-shadow: 0 4px 12px rgba(0,0,0,0.2); display: none; }
+    .global-search-results.active { display: block; }
+    .search-result-item { padding: 8px 12px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 11px; }
+    .search-result-item:hover { background: #f0f2f5; }
+    .search-result-item .highlight { background: #fff3cd; padding: 0 2px; border-radius: 2px; }
+    
+    .backup-status { display: flex; align-items: center; gap: 6px; font-size: 10px; background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 4px; }
+    .backup-status.warning { background: rgba(255,193,7,0.3); }
+    .backup-status.danger { background: rgba(220,53,69,0.3); }
+    
+    .tabs-bar { background: white; padding: 0 15px; display: flex; gap: 3px; border-bottom: 2px solid #e0e0e0; flex-shrink: 0; overflow-x: auto; }
+    .tab-btn { padding: 8px 14px; background: transparent; border: none; cursor: pointer; font-size: 12px; font-weight: 500; color: #7f8c8d; border-bottom: 3px solid transparent; margin-bottom: -2px; white-space: nowrap; }
+    .tab-btn:hover { color: #2a5298; background: #f8f9fa; }
+    .tab-btn.active { color: #2a5298; border-bottom-color: #2a5298; font-weight: 600; }
+    
+    .tab-content { flex: 1; display: none; flex-direction: column; overflow: hidden; min-height: 0; }
+    .tab-content.active { display: flex; }
+    
+    .toolbar { background: white; padding: 6px 15px; display: flex; gap: 6px; align-items: center; border-bottom: 1px solid #e0e0e0; flex-wrap: wrap; flex-shrink: 0; }
+    .toolbar button { padding: 5px 10px; border: 1px solid #ddd; border-radius: 4px; background: white; cursor: pointer; font-size: 11px; display: flex; align-items: center; gap: 3px; }
+    .toolbar button:hover { background: #f0f2f5; border-color: #2a5298; }
+    .toolbar button.primary { background: #2a5298; color: white; border-color: #2a5298; }
+    .toolbar button.success { background: #28a745; color: white; border-color: #28a745; }
+    .toolbar button.danger { background: #dc3545; color: white; border-color: #dc3545; }
+    .toolbar .separator { width: 1px; height: 18px; background: #ddd; margin: 0 3px; }
+    .toolbar label { font-size: 11px; display: flex; align-items: center; gap: 4px; }
+    .toolbar select, .toolbar input { padding: 3px 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px; }
+    .toolbar .stats { margin-left: auto; font-size: 11px; color: #7f8c8d; }
+    .toolbar .stats b { color: #2c3e50; }
+    
+    .bulk-actions { background: #e3f2fd; border: 1px solid #2196f3; padding: 6px 12px; display: none; align-items: center; gap: 10px; border-radius: 4px; }
+    .bulk-actions.active { display: flex; }
+    .bulk-actions .count { font-weight: 600; color: #1976d2; }
+    
+    .filters { background: #f8f9fa; padding: 5px 15px; display: flex; gap: 8px; align-items: center; border-bottom: 1px solid #e0e0e0; font-size: 11px; flex-wrap: wrap; flex-shrink: 0; }
+    .filters label { display: flex; align-items: center; gap: 3px; }
+    .filters select, .filters input { padding: 3px 6px; border: 1px solid #ddd; border-radius: 3px; font-size: 11px; }
+    
+    .table-wrapper { flex: 1; overflow: auto; background: white; position: relative; min-height: 0; }
+    table { border-collapse: collapse; font-size: 12px; }
+    thead { position: sticky; top: 0; z-index: 10; }
+    
+    th { background: #f1f3f4; border: 1px solid #dadce0; padding: 6px 4px; text-align: center; font-weight: 600; font-size: 10px; color: #3c4043; white-space: nowrap; user-select: none; cursor: pointer; position: relative; }
+    th:hover { background: #e8eaed; }
+    
+    .col-resizer { position: absolute; top: 0; right: 0; width: 4px; height: 100%; cursor: col-resize; user-select: none; background: transparent; z-index: 5; }
+    .col-resizer:hover, .col-resizer.active { background: #2a5298; }
+    
+    td { border: 1px solid #e0e0e0; padding: 3px 4px; vertical-align: middle; text-align: center; }
+    td.cell-number { text-align: center; font-variant-numeric: tabular-nums; }
+    td.cell-number.negative { color: #dc3545; }
+    td.cell-number.positive { color: #28a745; }
+    td.cell-text { text-align: left; white-space: normal; }
+    
+    td.cell-ti { cursor: default; }
+    td.cell-ti.has-link { background: #e8f0fe !important; color: #1a73e8; font-weight: 700; position: relative; }
+    td.cell-ti.has-link::after { content: '🔗'; position: absolute; top: 1px; right: 2px; font-size: 8px; opacity: 0.8; }
+    
+    td[contenteditable="true"]:focus { outline: 2px solid #2a5298; outline-offset: -2px; background: white !important; }
+    td[contenteditable="true"] { cursor: text; }
+    
+    td.search-highlight { background: #fff59d !important; }
+    td.has-comment { position: relative; }
+    td.has-comment::before { content: '💬'; position: absolute; top: 1px; left: 2px; font-size: 8px; opacity: 0.7; }
+    
+    td input[type="date"] { width: 100%; border: 1px solid transparent; background: transparent; font-size: 11px; padding: 2px; cursor: pointer; text-align: center; }
+    td input[type="date"]:hover { border-color: #ddd; background: white; }
+    
+    tr:hover td { background: #f8f9fa; }
+    tr.row-sold td { background: #e8f5e9; }
+    tr.row-sklad td { background: #fff8e1; }
+    tr.row-refusal td { background: #ffebee; }
+    
+    tr.total-row td { background: #e8f0fe !important; font-weight: bold; border-top: 2px solid #1a73e8; }
+    
+    td.row-num { background: #f1f3f4; text-align: center; color: #7f8c8d; font-size: 10px; width: 30px; cursor: default; }
+    td.checkbox-cell { width: 30px; padding: 0; }
+    td.checkbox-cell input { width: 16px; height: 16px; cursor: pointer; }
+    
+    .ti-hint { font-size: 10px; color: #7f8c8d; padding: 4px 15px; background: #f8f9fa; border-bottom: 1px solid #e0e0e0; flex-shrink: 0; }
+    
+    /* ТРАФИК */
+    .traffic-content { flex: 1; overflow: auto; padding: 10px; background: #f0f2f5; min-height: 0; }
+    .traffic-header-kpi { background: white; border-radius: 8px; padding: 10px 15px; margin-bottom: 10px; flex-shrink: 0; }
+    .traffic-header-kpi .kpi-title { font-size: 12px; font-weight: 600; margin-bottom: 8px; }
+    .traffic-header-kpi .kpi-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .kpi-block { background: #f8f9fa; border-radius: 6px; padding: 8px 12px; border-left: 3px solid #2a5298; }
+    .kpi-block.calls { border-left-color: #667eea; }
+    .kpi-block.visits { border-left-color: #11998e; }
+    .kpi-block .block-title { font-size: 11px; font-weight: 600; margin-bottom: 4px; }
+    .kpi-block .block-stats { display: flex; gap: 15px; flex-wrap: wrap; }
+    .kpi-block .stat-item { display: flex; flex-direction: column; }
+    .kpi-block .stat-label { font-size: 9px; text-transform: uppercase; color: #7f8c8d; font-weight: 600; }
+    .kpi-block .stat-value { font-size: 18px; font-weight: 700; margin-top: 1px; }
+    .kpi-block.calls .stat-value { color: #667eea; }
+    .kpi-block.visits .stat-value { color: #11998e; }
+    .kpi-block .stat-value.contracts { color: #e67e22; }
+    .kpi-block .stat-value.strike { color: #dc3545; }
+    .kpi-block .stat-value.percent { color: #28a745; }
+    
+    .traffic-section { background: white; border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+    .traffic-section-header { padding: 8px 14px; color: white; font-size: 13px; font-weight: 600; }
+    .traffic-section-header.calls { background: linear-gradient(135deg, #667eea, #764ba2); }
+    .traffic-section-header.visits { background: linear-gradient(135deg, #11998e, #38ef7d); }
+    .traffic-section-header.total { background: linear-gradient(135deg, #f093fb, #f5576c); }
+    
+    .traffic-table-wrapper { overflow-x: auto; }
+    .traffic-table { border-collapse: collapse; font-size: 11px; width: max-content; min-width: 100%; }
+    .traffic-table th { background: #2a5298; color: white; padding: 4px 2px; font-size: 10px; text-align: center; border: 1px solid #1e3c72; white-space: nowrap; }
+    .traffic-table th.model-header, .traffic-table td.model-cell { background: #1e3c72; position: sticky; left: 0; z-index: 15; min-width: 110px; text-align: left; padding: 4px 8px; font-weight: 600; color: white; }
+    .traffic-table td.model-cell { background: #34495e; color: #ecf0f1; }
+    .traffic-table th.day-header { min-width: 34px; width: 34px; }
+    .traffic-table th.day-header .day-num { font-size: 11px; font-weight: 700; display: block; }
+    .traffic-table th.day-header .day-name { font-size: 8px; opacity: 0.85; display: block; }
+    .traffic-table td.day-cell { min-width: 34px; width: 34px; }
+    .traffic-table td.day-cell[contenteditable="true"]:hover { background: #e8f0fe; cursor: text; }
+    .traffic-table th.summary-header { background: #28a745; min-width: 50px; }
+    .traffic-table th.contract-header { background: #e67e22; min-width: 60px; }
+    .traffic-table th.strike-header { background: #dc3545; min-width: 60px; }
+    .traffic-table td { padding: 3px 2px; border: 1px solid #e0e0e0; text-align: center; font-size: 11px; }
+    .traffic-table td.summary-cell { background: #e8f5e9; font-weight: 700; color: #1e7e34; min-width: 50px; }
+    .traffic-table td.contract-cell { background: #fff3cd; font-weight: 700; color: #856404; min-width: 60px; border-left: 2px solid #e67e22; }
+    .traffic-table td.strike-cell { background: #ffebee; font-weight: 700; color: #dc3545; min-width: 60px; border-left: 2px solid #dc3545; }
+    .traffic-table td.strike-cell.positive { color: #28a745; background: #e8f5e9; }
+    .traffic-table td.total-cell { background: #e8f0fe !important; font-weight: bold; color: #2a5298; }
+    .traffic-table td.total-cell.contract-total { background: #fff3cd !important; color: #856404; border-left: 2px solid #e67e22; }
+    .traffic-table td.plan-label { background: #f3e5f5; color: #6a1b9a; font-weight: 600; text-align: left; padding: 4px 8px; position: sticky; left: 0; z-index: 15; }
+    .traffic-table td.plan-cell { background: #fce4ec; min-width: 34px; padding: 2px 1px; }
+    .traffic-table td.plan-cell input { width: 100%; border: none; background: transparent; text-align: center; font-size: 11px; font-weight: 600; color: #6a1b9a; padding: 0; }
+    .traffic-table td.plan-total { background: #f3e5f5; font-weight: 700; color: #6a1b9a; min-width: 50px; }
+    .traffic-table td.contracts-label { background: #fff8e1; color: #f57f17; font-weight: 600; text-align: left; padding: 4px 8px; position: sticky; left: 0; z-index: 15; }
+    .traffic-table td.contracts-cell { background: #fff9c4; min-width: 34px; font-weight: 700; color: #f57f17; }
+    .traffic-table td.contracts-total { background: #fff8e1; font-weight: 700; color: #f57f17; min-width: 50px; }
+    .traffic-table td.bank-label { background: #fce4ec; color: #c2185b; font-weight: 700; text-align: left; padding: 4px 8px; position: sticky; left: 0; z-index: 15; }
+    .traffic-table td.bank-cell { background: #f8bbd0; min-width: 34px; font-weight: 700; color: #c2185b; }
+    .traffic-table td.bank-total { background: #fce4ec; font-weight: 700; color: #c2185b; min-width: 50px; }
+    .traffic-table tr.total-row td { background: #e8f0fe !important; font-weight: bold; border-top: 2px solid #2a5298; }
+    .traffic-table tr.total-row td.model-cell { background: #1e3c72 !important; color: white; }
+    
+    .traffic-weeks-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px; padding: 10px; background: #f8f9fa; border-top: 1px solid #e0e0e0; }
+    .week-block { background: white; border-radius: 6px; padding: 6px; text-align: center; border: 1px solid #e0e0e0; }
+    .week-block .week-title { font-size: 9px; font-weight: 600; color: #7f8c8d; margin-bottom: 3px; }
+    .week-block .week-traffic { font-size: 13px; font-weight: 700; color: #667eea; }
+    .week-block .week-contracts { font-size: 11px; color: #28a745; }
+    
+    .forecast-section { background: linear-gradient(135deg, #667eea, #764ba2); color: white; border-radius: 8px; padding: 15px; margin-bottom: 10px; }
+    .forecast-section h3 { margin-bottom: 10px; font-size: 14px; }
+    .forecast-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+    .forecast-item { background: rgba(255,255,255,0.15); border-radius: 6px; padding: 10px; text-align: center; }
+    .forecast-item .label { font-size: 10px; opacity: 0.9; margin-bottom: 4px; }
+    .forecast-item .value { font-size: 20px; font-weight: 700; }
+    .forecast-item .sub { font-size: 9px; opacity: 0.8; margin-top: 2px; }
+    
+    /* ПЛАН/ФАКТ - ИСПРАВЛЕНО */
+    .plan-fact-content { 
+        flex: 1; 
+        overflow: auto; 
+        padding: 10px; 
+        background: #f0f2f5; 
+        min-height: 0; 
+    }
+    .plan-fact-table-wrapper { 
+        overflow-x: auto; 
+        overflow-y: auto;
+        background: white; 
+        border-radius: 8px; 
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        max-height: calc(100vh - 120px);
+    }
+    .plan-fact-table { 
+        border-collapse: collapse; 
+        font-size: 10px; 
+        width: max-content;
+        min-width: 100%;
+    }
+    .plan-fact-table th {
+        background: #2a5298;
+        color: white;
+        padding: 3px 3px;
+        font-size: 9px;
+        text-align: center;
+        border: 1px solid #1e3c72;
+        white-space: nowrap;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    .plan-fact-table th.group-header { background: #1e3c72; font-weight: 700; font-size: 10px; }
+    .plan-fact-table th.sub-header { background: #3a6ab7; font-size: 9px; }
+    .plan-fact-table th.day-header { 
+        background: #4a7bc7; 
+        min-width: 28px; 
+        width: 28px; 
+        font-size: 9px; 
+    }
+    .plan-fact-table th.total-header { background: #28a745; font-weight: 700; }
+    .plan-fact-table th.fact-header { background: #e67e22; font-weight: 700; }
+    .plan-fact-table td {
+        padding: 2px 3px;
+        border: 1px solid #e0e0e0;
+        text-align: center;
+        font-size: 10px;
+    }
+    .plan-fact-table td.channel-name {
+        text-align: left;
+        padding-left: 8px;
+        font-weight: 500;
+        background: #f8f9fa;
+        min-width: 160px;
+        max-width: 200px;
+        position: sticky;
+        left: 0;
+        z-index: 5;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .plan-fact-table td.group-total { background: #e8f5e9; font-weight: 700; color: #1e7e34; }
+    .plan-fact-table td.grand-total { background: #fff3cd; font-weight: 700; color: #856404; font-size: 11px; }
+    .plan-fact-table td[contenteditable="true"] { cursor: text; background: white; }
+    .plan-fact-table td[contenteditable="true"]:focus { outline: 2px solid #2a5298; outline-offset: -2px; background: #e3f2fd; }
+    .plan-fact-table td[contenteditable="true"]:hover { background: #f0f2f5; }
+    .plan-fact-table td.calculated { background: #f5f5f5; color: #666; font-style: italic; }
+    .plan-fact-table td.fact-cell { background: #fff8e1; font-weight: 600; }
+    .plan-fact-table td.fact-cell[contenteditable="true"]:focus { background: #ffecb3; }
+    .plan-fact-table tr:hover td { background: #f8f9fa; }
+    .plan-fact-table tr:hover td.channel-name { background: #e8f0fe; }
+    .plan-fact-table tr:hover td.group-total { background: #c8e6c9; }
+    .plan-fact-table tr:hover td.grand-total { background: #ffe082; }
+    .plan-fact-table tr.group-header-row td { background: #1e3c72; color: white; font-weight: 700; text-align: left; padding-left: 8px; font-size: 11px; }
+    
+    /* АНАЛИТИКА */
+    .analytics-content { flex: 1; overflow-y: auto; padding: 12px; background: #f0f2f5; min-height: 0; }
+    .analytics-content h2 { margin-bottom: 10px; color: #2c3e50; font-size: 16px; }
+    .analytics-content h3 { margin: 15px 0 6px; color: #2c3e50; font-size: 13px; }
+    .analytics-controls { background: white; padding: 10px; border-radius: 6px; margin-bottom: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .analytics-controls label { font-weight: 500; font-size: 11px; display: flex; align-items: center; gap: 3px; }
+    .analytics-controls select { padding: 4px 7px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px; min-width: 110px; }
+    .analytics-controls .reset-btn { padding: 4px 9px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 10px; }
+    .group-switcher { display: flex; background: #f0f2f5; border-radius: 6px; padding: 2px; gap: 2px; border: 1px solid #e0e0e0; }
+    .group-switcher button { padding: 5px 12px; background: transparent; border: none; border-radius: 5px; cursor: pointer; font-size: 11px; font-weight: 500; color: #7f8c8d; }
+    .group-switcher button:hover { color: #2a5298; background: white; }
+    .group-switcher button.active { background: #2a5298; color: white; }
+    
+    .summary-table { width: 100%; border-collapse: collapse; background: white; border-radius: 6px; overflow: hidden; margin-bottom: 12px; font-size: 10px; }
+    .summary-table th { background: #2a5298; color: white; padding: 6px 4px; font-size: 9px; text-align: center; border: 1px solid #1e3c72; font-weight: 600; }
+    .summary-table th.group-header { background: #1e3c72; font-size: 11px; padding: 5px; }
+    .summary-table td { padding: 5px 4px; border: 1px solid #e0e0e0; text-align: center; font-size: 10px; }
+    .summary-table td.group-name { font-weight: 600; text-align: left; background: #f8f9fa; white-space: nowrap; position: sticky; left: 0; z-index: 5; }
+    .summary-table td.cell-number { text-align: right; font-variant-numeric: tabular-nums; }
+    .summary-table td.cell-number.negative { color: #dc3545; }
+    .summary-table td.cell-number.positive { color: #28a745; }
+    .summary-table td.cell-percent { color: #2a5298; font-weight: 600; }
+    .summary-table tr.total-row td { background: #e8f0fe !important; font-weight: bold; border-top: 2px solid #2a5298; }
+    .summary-table tr.total-row td.group-name { background: #d0e0ff !important; position: sticky; left: 0; }
+    .summary-table tr:hover td { background: #f8f9fa; }
+    
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 12px; }
+    .kpi-card { background: white; padding: 12px; border-radius: 6px; border-left: 3px solid #2a5298; }
+    .kpi-card .label { font-size: 10px; text-transform: uppercase; color: #7f8c8d; font-weight: 600; }
+    .kpi-card .value { font-size: 20px; font-weight: bold; margin: 4px 0; }
+    .kpi-card .sub { font-size: 10px; color: #95a5a6; }
+    .kpi-card.positive { border-left-color: #28a745; }
+    .kpi-card.negative { border-left-color: #dc3545; }
+    .kpi-card.neutral { border-left-color: #ffc107; }
+    .info-badge { display: inline-block; background: #e8f0fe; color: #2a5298; padding: 2px 5px; border-radius: 3px; font-size: 9px; font-weight: 600; margin-left: 4px; }
+    
+    /* КАЛЕНДАРЬ */
+    .calendar-content { flex: 1; overflow: auto; padding: 15px; background: #f0f2f5; min-height: 0; }
+    .calendar-controls { display: flex; align-items: center; justify-content: space-between; background: white; padding: 12px 15px; border-radius: 8px; margin-bottom: 12px; }
+    .calendar-controls h3 { font-size: 16px; }
+    .calendar-nav-btns { display: flex; gap: 8px; }
+    .calendar-nav-btns button { padding: 6px 14px; background: #2a5298; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 11px; }
+    .calendar-nav-btns button:hover { background: #1e3c72; }
+    .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+    .calendar-day-header { text-align: center; font-weight: 600; font-size: 11px; color: #7f8c8d; padding: 8px; }
+    .calendar-day { background: white; border-radius: 8px; padding: 8px; min-height: 90px; border: 1px solid #e0e0e0; cursor: pointer; }
+    .calendar-day:hover { border-color: #2a5298; transform: translateY(-2px); }
+    .calendar-day.today { border: 2px solid #2a5298; }
+    .calendar-day.other-month { opacity: 0.4; }
+    .calendar-day .day-number { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+    .calendar-day .day-stats { display: flex; flex-direction: column; gap: 3px; }
+    .calendar-stat { display: flex; justify-content: space-between; font-size: 9px; padding: 2px 4px; border-radius: 3px; }
+    .calendar-stat.plan-meetings { background: #d4edda; color: #155724; }
+    .calendar-stat.plan-contracts { background: #cce5ff; color: #004085; }
+    .calendar-stat.fact-contracts { background: #fff3cd; color: #856404; }
+    .calendar-stat.fact-issued { background: #e2d5f1; color: #4a235a; }
+    .calendar-stat .stat-label { font-weight: 600; }
+    .calendar-stat .stat-value { font-weight: 700; }
+    
+    .calendar-day-modal .day-detail { padding: 10px; background: #f8f9fa; border-radius: 6px; margin-bottom: 8px; }
+    .calendar-day-modal .day-detail label { font-size: 11px; font-weight: 600; color: #2a5298; }
+    .calendar-day-modal .day-detail input { width: 60px; padding: 4px; text-align: center; border: 1px solid #ddd; border-radius: 4px; }
+    
+    /* ИСТОРИЯ */
+    .history-list { max-height: 500px; overflow-y: auto; background: white; border-radius: 6px; padding: 10px; }
+    .history-item { padding: 8px 12px; border-bottom: 1px solid #eee; font-size: 11px; display: flex; gap: 10px; }
+    .history-item:hover { background: #f8f9fa; }
+    .history-time { color: #7f8c8d; min-width: 120px; font-size: 10px; }
+    .history-action { flex: 1; }
+    .history-type { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 9px; font-weight: 600; margin-right: 5px; }
+    .history-type.add { background: #d4edda; color: #155724; }
+    .history-type.edit { background: #fff3cd; color: #856404; }
+    .history-type.delete { background: #f8d7da; color: #721c24; }
+    .history-type.bulk { background: #d1ecf1; color: #0c5460; }
+    
+    /* МОДАЛЬНЫЕ ОКНА */
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+    .modal.active { display: flex; }
+    .modal-content { background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 700px; max-height: 85vh; overflow-y: auto; }
+    .modal-content.small { max-width: 450px; }
+    .modal-content h2 { margin-bottom: 15px; color: #2c3e50; font-size: 16px; }
+    .modal-content label { display: block; margin-top: 8px; font-weight: 500; font-size: 12px; }
+    .modal-content input, .modal-content select, .modal-content textarea { width: 100%; padding: 7px; margin-top: 3px; border: 1px solid #ddd; border-radius: 5px; font-size: 12px; }
+    .modal-actions { margin-top: 15px; display: flex; gap: 8px; justify-content: flex-end; }
+    .modal-actions button { padding: 7px 15px; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; }
+    .btn-cancel { background: #e0e0e0; color: #333; }
+    .btn-confirm { background: #2a5298; color: white; }
+    .btn-danger { background: #dc3545; color: white; }
+    .btn-step { background: #28a745; color: white; }
+    
+    .step-form { padding: 15px; background: #f8f9fa; border-radius: 8px; margin-bottom: 10px; }
+    .step-form .step-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #2a5298; }
+    .step-indicator { display: flex; justify-content: center; gap: 6px; margin-bottom: 15px; }
+    .step-dot { width: 8px; height: 8px; border-radius: 50%; background: #ddd; }
+    .step-dot.active { background: #2a5298; transform: scale(1.3); }
+    .step-dot.done { background: #28a745; }
+    
+    .channels-list { border: 1px solid #e0e0e0; border-radius: 6px; overflow: hidden; margin-top: 10px; max-height: 300px; overflow-y: auto; }
+    .channel-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid #e0e0e0; background: white; }
+    .channel-item:hover { background: #f8f9fa; }
+    .channel-item:last-child { border-bottom: none; }
+    .channel-item .channel-name { flex: 1; font-size: 12px; }
+    .channel-item .channel-group { font-size: 10px; color: #7f8c8d; background: #f0f2f5; padding: 2px 6px; border-radius: 3px; }
+    .channel-item button { padding: 3px 7px; font-size: 10px; border: 1px solid #ddd; border-radius: 3px; background: white; cursor: pointer; }
+    .channel-item button.danger { color: #dc3545; border-color: #dc3545; }
+    
+    .add-channel-form { margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 6px; }
+    .add-channel-form h3 { font-size: 12px; margin-bottom: 8px; }
+    
+    /* Контекстные меню */
+    .context-menu { position: fixed; background: white; border: 1px solid #ddd; border-radius: 5px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1500; display: none; min-width: 200px; }
+    .context-menu.active { display: block; }
+    .context-menu-item { padding: 7px 12px; cursor: pointer; font-size: 11px; }
+    .context-menu-item:hover { background: #f0f2f5; }
+    .context-menu-item.danger { color: #dc3545; }
+    .context-menu-separator { height: 1px; background: #e0e0e0; margin: 2px 0; }
+    
+    .shortcuts-hint { position: fixed; bottom: 60px; left: 20px; background: rgba(0,0,0,0.8); color: white; padding: 10px 15px; border-radius: 6px; font-size: 10px; z-index: 1000; display: none; max-width: 250px; }
+    .shortcuts-hint.active { display: block; }
+    .shortcuts-hint kbd { background: rgba(255,255,255,0.2); padding: 1px 5px; border-radius: 3px; font-family: monospace; margin: 0 2px; }
+    
+    .toast { position: fixed; bottom: 15px; right: 15px; background: #28a745; color: white; padding: 8px 15px; border-radius: 6px; z-index: 2000; font-size: 12px; max-width: 300px; }
+    .toast.error { background: #dc3545; }
+    .toast.warning { background: #ffc107; color: #333; }
+</style>
+</head>
+<body>
+
+<div class="app-header">
+    <div>
+        <h1>🚗 CRM Отдел продаж</h1>
+        <p>Управление сделками и аналитика</p>
+    </div>
+    <div class="right-section">
+        <div class="global-search">
+            <span style="margin-right: 5px;">🔍</span>
+            <input type="text" id="globalSearchInput" placeholder="Поиск..." oninput="performGlobalSearch()" onfocus="showSearchResults()" onblur="setTimeout(hideSearchResults, 200)">
+            <div class="global-search-results" id="globalSearchResults"></div>
+        </div>
+        <div class="backup-status" id="backupStatus"><span id="backupStatusText">💾 Автосохранение</span></div>
+        <div id="currentDate"></div>
+    </div>
+</div>
+
+<div class="tabs-bar">
+    <button class="tab-btn active" data-tab="sklad">📦 Склад</button>
+    <button class="tab-btn" data-tab="traffic">📊 Трафик</button>
+    <button class="tab-btn" data-tab="planfact">📋 План/Факт</button>
+    <button class="tab-btn" data-tab="analytics">📈 Аналитика</button>
+    <button class="tab-btn" data-tab="calendar">📅 Календарь</button>
+    <button class="tab-btn" data-tab="history">📜 История</button>
+</div>
+
+<!-- СКЛАД -->
+<div class="tab-content active" id="tab-sklad">
+    <div class="toolbar">
+        <button class="primary" onclick="openStepForm()">➕ Добавить</button>
+        <button onclick="duplicateRow('sklad')">📋 Дублировать</button>
+        <div class="separator"></div>
+        <button onclick="openBulkDeleteModal('sklad')">🗑️ Массовое</button>
+        <div class="separator"></div>
+        <button class="success" onclick="saveFullBackup()">💾 Бэкап</button>
+        <button onclick="exportCSV('sklad')">📥 CSV</button>
+        <button onclick="exportToExcel()">📊 Excel</button>
+        <button onclick="document.getElementById('import-sklad').click()">📤 Импорт</button>
+        <input type="file" id="import-sklad" accept=".csv,.xlsx,.xls" style="display:none" onchange="importFile(event, 'sklad')">
+        <div class="separator"></div>
+        <button onclick="printReport()">🖨️ Печать</button>
+        <div class="stats" id="stats-sklad"></div>
+    </div>
+    <div class="bulk-actions" id="bulkActions-sklad">
+        <span>Выбрано: <span class="count" id="bulkCount-sklad">0</span></span>
+        <button class="danger" onclick="deleteSelectedRows('sklad')">🗑️ Удалить</button>
+        <button onclick="clearSelection('sklad')">✖ Снять</button>
+    </div>
+    <div class="filters" id="filters-sklad"></div>
+    <div class="ti-hint">💡 <strong>ТИ</strong>: ПКМ → ссылка. <strong>Стрелки</strong> — навигация. <kbd>Ctrl+A</kbd> — выделить все.</div>
+    <div class="table-wrapper">
+        <table id="table-sklad">
+            <colgroup id="colgroup-sklad"></colgroup>
+            <thead><tr id="thead-sklad"></tr></thead>
+            <tbody id="tbody-sklad"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ТРАФИК -->
+<div class="tab-content" id="tab-traffic">
+    <div class="toolbar">
+        <label>📅 Месяц: <input type="month" id="traffic-month" onchange="renderTrafficTables()"></label>
+        <div class="separator"></div>
+        <label>С: <input type="date" id="traffic-date-from" onchange="renderTrafficTables()"></label>
+        <label>По: <input type="date" id="traffic-date-to" onchange="renderTrafficTables()"></label>
+        <button onclick="setTrafficDateRange('week')">Неделя</button>
+        <button onclick="setTrafficDateRange('month')">Месяц</button>
+        <button onclick="setTrafficDateRange('quarter')">Квартал</button>
+        <button onclick="clearTrafficDateRange()">Сброс</button>
+        <div class="separator"></div>
+        <button class="success" onclick="exportTrafficToExcel()">📊 Excel</button>
+        <button onclick="exportTrafficCSV()">📥 CSV</button>
+        <div class="stats" id="stats-traffic"></div>
+    </div>
+    <div class="traffic-content">
+        <div class="forecast-section" id="forecast-section"></div>
+        <div class="traffic-header-kpi" id="traffic-header-kpi"></div>
+        <div class="traffic-section">
+            <div class="traffic-section-header calls">📞 Звонки и Заявки</div>
+            <div class="traffic-table-wrapper">
+                <table class="traffic-table" id="calls-table"><thead id="calls-thead"></thead><tbody id="calls-tbody"></tbody></table>
+            </div>
+            <div class="traffic-weeks-summary" id="calls-weeks"></div>
+        </div>
+        <div class="traffic-section">
+            <div class="traffic-section-header visits">🚶 Визиты в салон</div>
+            <div class="traffic-table-wrapper">
+                <table class="traffic-table" id="visits-table"><thead id="visits-thead"></thead><tbody id="visits-tbody"></tbody></table>
+            </div>
+            <div class="traffic-weeks-summary" id="visits-weeks"></div>
+        </div>
+        <div class="traffic-section">
+            <div class="traffic-section-header total">💼 Общий банк контрактов</div>
+            <div class="traffic-table-wrapper">
+                <table class="traffic-table" id="total-table"><thead id="total-thead"></thead><tbody id="total-tbody"></tbody></table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ПЛАН/ФАКТ -->
+<div class="tab-content" id="tab-planfact">
+    <div class="toolbar">
+        <label>📅 Месяц: <select id="planfact-month" onchange="renderPlanFactTable()"></select></label>
+        <div class="separator"></div>
+        <button class="success" onclick="exportPlanFactToExcel()">📊 Экспорт Excel</button>
+        <button onclick="document.getElementById('import-planfact').click()">📤 Импорт</button>
+        <input type="file" id="import-planfact" accept=".xlsx,.xls" style="display:none" onchange="importPlanFactFromExcel(event)">
+        <div class="separator"></div>
+        <button onclick="openChannelsSettings()">⚙️ Настройки каналов</button>
+        <button onclick="recalculateAll()">🔄 Пересчитать</button>
+    </div>
+    <div class="plan-fact-content">
+        <div class="plan-fact-table-wrapper">
+            <table class="plan-fact-table" id="planfact-table">
+                <thead id="planfact-thead"></thead>
+                <tbody id="planfact-tbody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- АНАЛИТИКА -->
+<div class="tab-content" id="tab-analytics">
+    <div class="analytics-content" id="analyticsContent"></div>
+</div>
+
+<!-- КАЛЕНДАРЬ -->
+<div class="tab-content" id="tab-calendar">
+    <div class="calendar-content" id="calendarContent"></div>
+</div>
+
+<!-- ИСТОРИЯ -->
+<div class="tab-content" id="tab-history">
+    <div class="analytics-content">
+        <h2>📜 История изменений</h2>
+        <div class="toolbar">
+            <button onclick="clearHistory()">🗑️ Очистить</button>
+            <button onclick="exportHistory()">📥 Экспорт</button>
+            <div class="stats">Всего: <b id="historyCount">0</b></div>
+        </div>
+        <div class="history-list" id="historyList"></div>
+    </div>
+</div>
+
+<!-- МОДАЛЬНЫЕ ОКНА -->
+<div class="context-menu" id="contextMenu">
+    <div class="context-menu-item" data-action="duplicate">📋 Дублировать</div>
+    <div class="context-menu-item" data-action="insertAbove">⬆️ Вставить выше</div>
+    <div class="context-menu-item" data-action="insertBelow">⬇️ Вставить ниже</div>
+    <div class="context-menu-separator"></div>
+    <div class="context-menu-item danger" data-action="delete">🗑️ Удалить</div>
+</div>
+
+<div class="context-menu" id="tiContextMenu">
+    <div class="context-menu-item" data-action="addLink">🔗 Внести ссылку</div>
+    <div class="context-menu-item" data-action="openLink">🌐 Открыть</div>
+    <div class="context-menu-separator"></div>
+    <div class="context-menu-item" data-action="editLink">✏️ Редактировать</div>
+    <div class="context-menu-item danger" data-action="removeLink">🗑️ Удалить</div>
+</div>
+
+<div class="context-menu" id="commentContextMenu">
+    <div class="context-menu-item" data-action="addComment">💬 Добавить</div>
+    <div class="context-menu-item" data-action="editComment">✏️ Редактировать</div>
+    <div class="context-menu-separator"></div>
+    <div class="context-menu-item danger" data-action="removeComment">🗑️ Удалить</div>
+</div>
+
+<div class="context-menu" id="headerContextMenu">
+    <div class="context-menu-item" data-action="rename">✏️ Переименовать</div>
+    <div class="context-menu-item" data-action="changeType">🔄 Изменить тип</div>
+    <div class="context-menu-item" data-action="insertLeft">⬅️ Вставить слева</div>
+    <div class="context-menu-item" data-action="insertRight">➡️ Вставить справа</div>
+    <div class="context-menu-separator"></div>
+    <div class="context-menu-item danger" data-action="deleteCol">🗑️ Удалить</div>
+</div>
+
+<div class="modal" id="settingsModal">
+    <div class="modal-content">
+        <h2>⚙️ Настройки таблицы</h2>
+        <div class="columns-list" id="columnsList"></div>
+        <div style="margin-top:10px; padding:10px; background:#f8f9fa; border-radius:6px;">
+            <h3 style="font-size:12px; margin-bottom:6px;">➕ Добавить столбец</h3>
+            <label>Название:</label>
+            <input type="text" id="newColumnName">
+            <label>Тип:</label>
+            <select id="newColumnType">
+                <option value="text">Текст</option>
+                <option value="number">Число</option>
+                <option value="date">Дата</option>
+                <option value="url">Ссылка</option>
+                <option value="select">Список</option>
+            </select>
+            <div id="newColumnOptionsDiv" style="display:none; margin-top:6px;">
+                <label>Значения (через запятую):</label>
+                <input type="text" id="newColumnOptions">
+            </div>
+            <button class="btn-confirm" style="margin-top:6px;" onclick="addColumn()">Добавить</button>
+        </div>
+        <div class="modal-actions">
+            <button class="btn-cancel" onclick="closeSettings()">Закрыть</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="linkModal">
+    <div class="modal-content small">
+        <h2>🔗 Ссылка на оценку</h2>
+        <p style="color:#7f8c8d; font-size:11px; margin-bottom:10px;" id="linkModalInfo"></p>
+        <label>URL:</label>
+        <input type="url" id="linkModalInput" placeholder="https://..." onkeydown="if(event.key==='Enter') saveLink()">
+        <div class="modal-actions">
+            <button class="btn-cancel" onclick="closeLinkModal()">Отмена</button>
+            <button class="btn-confirm" onclick="saveLink()">💾 Сохранить</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="linksArchiveModal">
+    <div class="modal-content">
+        <h2>🔗 Архив ссылок</h2>
+        <div id="linksArchiveList" style="max-height:400px; overflow-y:auto;"></div>
+        <div class="modal-actions">
+            <button class="btn-danger" onclick="clearLinksArchive()">🗑️ Очистить</button>
+            <button class="btn-cancel" onclick="closeLinksArchive()">Закрыть</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="stepFormModal">
+    <div class="modal-content small">
+        <h2>➕ Новая сделка</h2>
+        <div class="step-indicator" id="stepIndicator"></div>
+        <div id="stepFormContent"></div>
+        <div class="modal-actions">
+            <button class="btn-cancel" onclick="closeStepForm()">Отмена</button>
+            <button class="btn-cancel" id="stepPrevBtn" style="display:none;" onclick="stepFormPrev()">← Назад</button>
+            <button class="btn-step" id="stepNextBtn" onclick="stepFormNext()">Далее →</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="calendarDayModal">
+    <div class="modal-content small calendar-day-modal">
+        <h2 id="calendarDayTitle">📅 День</h2>
+        <div id="calendarDayContent"></div>
+        <div class="modal-actions">
+            <button class="btn-confirm" onclick="closeCalendarDayModal()">Закрыть</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="bulkDeleteModal">
+    <div class="modal-content small">
+        <h2>🗑️ Массовое удаление</h2>
+        <label>Статус:</label>
+        <select id="bulkDeleteStatus">
+            <option value="">Все</option>
+            <option value="Продан">Продан</option>
+            <option value="Склад">Склад</option>
+            <option value="Отказ">Отказ</option>
+        </select>
+        <label>Модель:</label>
+        <select id="bulkDeleteModel"><option value="">Все</option></select>
+        <label>Период (с):</label>
+        <input type="date" id="bulkDeleteFrom">
+        <label>Период (по):</label>
+        <input type="date" id="bulkDeleteTo">
+        <p style="margin-top:10px; color:#dc3545; font-size:11px;">⚠️ Будет удалено: <b id="bulkDeleteCount">0</b> строк</p>
+        <div class="modal-actions">
+            <button class="btn-cancel" onclick="closeBulkDeleteModal()">Отмена</button>
+            <button class="btn-danger" onclick="executeBulkDelete()">🗑️ Удалить</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="channelsModal">
+    <div class="modal-content">
+        <h2>⚙️ Настройки каналов трафика</h2>
+        <div id="channelsList"></div>
+        <div class="add-channel-form">
+            <h3>➕ Добавить канал</h3>
+            <label>Название:</label>
+            <input type="text" id="newChannelName">
+            <label>Группа:</label>
+            <select id="newChannelGroup"></select>
+            <label>Бюджет:</label>
+            <input type="number" id="newChannelBudget" value="0">
+            <label>CPL:</label>
+            <input type="number" id="newChannelCPL" value="0">
+            <label>РЛ:</label>
+            <input type="number" id="newChannelRL" value="0">
+            <label>SR%:</label>
+            <input type="number" id="newChannelSR" value="0" step="0.1">
+            <button class="btn-confirm" style="margin-top:8px;" onclick="addChannel()">Добавить</button>
+        </div>
+        <div class="modal-actions">
+            <button class="btn-cancel" onclick="closeChannelsSettings()">Закрыть</button>
+        </div>
+    </div>
+</div>
+
+<div class="shortcuts-hint" id="shortcutsHint">
+    <div><kbd>←↑→↓</kbd> Навигация</div>
+    <div><kbd>Ctrl+A</kbd> Выделить все</div>
+    <div><kbd>Ctrl+S</kbd> Бэкап</div>
+    <div><kbd>Ctrl+F</kbd> Поиск</div>
+    <div><kbd>Ctrl+P</kbd> Печать</div>
+    <div><kbd>?</kbd> Эта подсказка</div>
+</div>
+
+<script>
+// ДАННЫЕ
+function getDefaultSkladData() {
+    return [
+        { id: 1, model: 'Tenet T7', status: 'Отказ', dateDkp: '2026-05-29', dateIssued: '', seller: 'Лавреев Сергей', client: 'Угрюмов Сергей Александрович', jok: 0, j: 0, o: 0, k: 0, risk: '4', kr: '0', ti: '1', review: 'Нет отзыва', traffic: '🚶 Визит', comment: 'Купил джолион у нас' },
+        { id: 2, model: 'Tenet T7', status: 'Продан', dateDkp: '2026-06-01', dateIssued: '2026-06-01', seller: 'Мелузов Евгений', client: 'Матюнин Андрей Валентинович', jok: 162541, j: -19746, o: 0, k: 182287, risk: '1', kr: '1', ti: '1', review: 'Нет отзыва', traffic: '📞 Звонок', comment: 'Выдана' },
+        { id: 3, model: 'Tenet T4L', status: 'Продан', dateDkp: '2026-06-03', dateIssued: '2026-06-03', seller: 'Буц Виктория', client: 'Евдокимова Елена Васильевна', jok: 140750, j: -39717, o: 0, k: 180467, risk: '1', kr: '1', ti: '1', review: 'Нет отзыва', traffic: '📝 Заявка', comment: 'Выдана' },
+        { id: 4, model: 'Tenet T7', status: 'Продан', dateDkp: '2026-06-03', dateIssued: '2026-06-03', seller: 'Буц Виктория', client: 'Кузнецов Александр Сергеевич', jok: 181429, j: 24622, o: 0, k: 156807, risk: '1', kr: '1', ti: '0', review: 'Нет отзыва', traffic: '🚶 Визит', comment: 'Выдана' },
+        { id: 5, model: 'Tenet T4', status: 'Продан', dateDkp: '2026-06-04', dateIssued: '2026-06-04', seller: 'Алексеев Владимир', client: 'Григорьев Сергей Павлович', jok: 205796, j: 6324, o: 0, k: 199472, risk: '1', kr: '1', ti: '1', review: 'Яндекс карты', traffic: '🚶 Визит', comment: 'Выдана' }
+    ];
+}
+
+const TABS_CONFIG = {
+    sklad: {
+        name: 'Склад',
+        statusField: 'status',
+        statusMap: { 'Продан': 'row-sold', 'Склад': 'row-sklad', 'Отказ': 'row-refusal' },
+        defaultColumns: [
+            { key: 'model', label: 'Модель', type: 'select', options: 'model', default: 'Tenet T7', width: 110 },
+            { key: 'status', label: 'Статус', type: 'select', options: 'status', default: 'Продан', width: 100 },
+            { key: 'dateDkp', label: 'Дата ДКП', type: 'date', default: '', width: 100 },
+            { key: 'dateIssued', label: 'Дата выдачи', type: 'date', default: '', width: 110 },
+            { key: 'seller', label: 'Продавец', type: 'select', options: 'seller', default: '', width: 170 },
+            { key: 'client', label: 'Клиент', type: 'text', default: '', width: 200 },
+            { key: 'jok', label: 'ЖОК', type: 'number', default: 0, width: 100 },
+            { key: 'j', label: 'Ж', type: 'number', default: 0, width: 80 },
+            { key: 'o', label: 'О', type: 'number', default: 0, width: 80 },
+            { key: 'k', label: 'К', type: 'number', default: 0, width: 80 },
+            { key: 'risk', label: 'РИСК', type: 'select', options: 'risk', default: '1', width: 60 },
+            { key: 'kr', label: 'КР', type: 'select', options: 'kr', default: '0', width: 50 },
+            { key: 'ti', label: 'ТИ', type: 'select', options: 'ti', default: '0', width: 60 },
+            { key: 'review', label: 'Отзывы', type: 'select', options: 'review', default: 'Нет отзыва', width: 130 },
+            { key: 'traffic', label: 'Трафик', type: 'select', options: 'traffic', default: '🚶 Визит', width: 130 },
+            { key: 'comment', label: 'Комментарий', type: 'text', default: '', width: 250 }
+        ]
+    }
+};
+
+const DEFAULT_SELECT_OPTIONS = {
+    model: ['Arrizo 8', 'Tenet T4', 'Tenet T4L', 'Tenet T7', 'Tenet T8'],
+    status: ['Продан', 'Склад', 'Отказ'],
+    seller: ['Лавреев Сергей', 'Мелузов Евгений', 'Буц Виктория', 'Алексеев Владимир', 'Даниленко Сергей', 'Коваленко Павел'],
+    review: ['Нет отзыва', 'Яндекс карты', '2ГИС', 'Рекомендация'],
+    traffic: ['🚶 Визит', '📞 Звонок', '📝 Заявка', '👥 Рекомендация'],
+    risk: ['1', '2', '3', '4', '5'],
+    kr: ['0', '1'],
+    ti: ['0', '1', '2']
+};
+
+const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+const DEFAULT_GROUPS = ['Digital', 'Классифайды', 'Геосервисы и SERM', 'Direct', 'Offline', 'Обязательное', 'Прочее'];
+
+const DEFAULT_CHANNELS = [
+    { name: 'Я.Директ (без НДС)', group: 'Digital', budget: 100000, cpl: 6666.67, rl: 15, sr: 10.0 },
+    { name: 'Яндекс органика-поиск', group: 'Digital', budget: 0, cpl: 0, rl: 5, sr: 7.0 },
+    { name: 'Google органика-поиск', group: 'Digital', budget: 0, cpl: 0, rl: 0, sr: 7.0 },
+    { name: 'LMS - дистибьютор', group: 'Digital', budget: 0, cpl: 0, rl: 5, sr: 7.0 },
+    { name: 'Вконтакте таргет', group: 'Digital', budget: 20000, cpl: 2000, rl: 10, sr: 7.0 },
+    { name: 'Реклама ВК сообщества', group: 'Digital', budget: 5000, cpl: 1000, rl: 5, sr: 7.0 },
+    { name: 'Avito', group: 'Классифайды', budget: 15000, cpl: 1000, rl: 15, sr: 10.0 },
+    { name: 'Avito CHERY', group: 'Классифайды', budget: 15000, cpl: 1000, rl: 15, sr: 10.0 },
+    { name: 'Auto.ru', group: 'Классифайды', budget: 15000, cpl: 1000, rl: 15, sr: 10.0 },
+    { name: 'Auto.ru CHERY', group: 'Классифайды', budget: 15000, cpl: 1000, rl: 15, sr: 10.0 },
+    { name: 'Autospot', group: 'Классифайды', budget: 0, cpl: 0, rl: 10, sr: 7.0 },
+    { name: 'Drom', group: 'Классифайды', budget: 1600, cpl: 800, rl: 2, sr: 7.0 },
+    { name: 'Яндекс Карты', group: 'Геосервисы и SERM', budget: 35000, cpl: 3500, rl: 10, sr: 10.0 },
+    { name: 'Яндекс Карты CHERY', group: 'Геосервисы и SERM', budget: 0, cpl: 0, rl: 2, sr: 10.0 },
+    { name: '2Gis', group: 'Геосервисы и SERM', budget: 305, cpl: 0, rl: 0, sr: 7.0 },
+    { name: 'SMS-рассылка', group: 'Direct', budget: 15000, cpl: 3000, rl: 5, sr: 10.0 },
+    { name: 'Лидген', group: 'Direct', budget: 0, cpl: 0, rl: 0, sr: 10.0 },
+    { name: 'Т-банк, Сбербанк', group: 'Direct', budget: 0, cpl: 0, rl: 0, sr: 0.0 },
+    { name: 'Знакомые', group: 'Direct', budget: 0, cpl: 0, rl: 0, sr: 0.0 },
+    { name: 'BTL', group: 'Offline', budget: 0, cpl: 0, rl: 0, sr: 7.0 },
+    { name: 'Радио', group: 'Offline', budget: 206000, cpl: 20600, rl: 10, sr: 7.0 },
+    { name: 'DOOH / OOH', group: 'Offline', budget: 120000, cpl: 24000, rl: 5, sr: 7.0 },
+    { name: 'НДС Яндекс', group: 'Обязательное', budget: 24200, cpl: 0, rl: 0, sr: 0 },
+    { name: 'Кабинет Авито', group: 'Обязательное', budget: 12000, cpl: 0, rl: 0, sr: 0 },
+    { name: 'Кабинет Авито CHERY', group: 'Обязательное', budget: 12000, cpl: 0, rl: 0, sr: 0 },
+    { name: 'Сайт импортера', group: 'Обязательное', budget: 20740, cpl: 0, rl: 0, sr: 0 },
+    { name: 'Сайт импортера CHERY', group: 'Обязательное', budget: 20740, cpl: 0, rl: 0, sr: 0 },
+    { name: 'Calltouch телефония', group: 'Обязательное', budget: 20000, cpl: 0, rl: 0, sr: 0 },
+    { name: 'Calltouch аналитика', group: 'Обязательное', budget: 10000, cpl: 0, rl: 0, sr: 0 },
+    { name: 'POSM для шоу-рума', group: 'Обязательное', budget: 10000, cpl: 0, rl: 0, sr: 0 },
+    { name: 'POSM для сотрудников', group: 'Обязательное', budget: 10000, cpl: 0, rl: 0, sr: 0 },
+    { name: 'Расклейка и оклейка а/м', group: 'Обязательное', budget: 10000, cpl: 0, rl: 0, sr: 0 },
+    { name: 'Пешеходы', group: 'Прочее', budget: 0, cpl: 0, rl: 35, sr: 25.0 },
+    { name: 'Выдачи других ДЦ', group: 'Прочее', budget: 0, cpl: 0, rl: 0, sr: 0.0 },
+    { name: 'Холодные звонки', group: 'Прочее', budget: 0, cpl: 0, rl: 5, sr: 5.0 }
+];
+
+let selectOptions = JSON.parse(localStorage.getItem('crm_select_options_v32') || 'null') || JSON.parse(JSON.stringify(DEFAULT_SELECT_OPTIONS));
+let tabsState = {
+    sklad: {
+        columns: JSON.parse(localStorage.getItem('crm_cols_sklad_v32') || 'null') || JSON.parse(JSON.stringify(TABS_CONFIG.sklad.defaultColumns)),
+        data: JSON.parse(localStorage.getItem('crm_data_sklad_v32') || 'null') || getDefaultSkladData()
+    }
+};
+
+let trafficData = JSON.parse(localStorage.getItem('crm_traffic_v32') || 'null') || {};
+let evaluationLinks = JSON.parse(localStorage.getItem('crm_eval_links_v32') || 'null') || {};
+let linksArchive = JSON.parse(localStorage.getItem('crm_links_archive_v32') || 'null') || {};
+let calendarData = JSON.parse(localStorage.getItem('crm_calendar_data_v32') || 'null') || {};
+let todayPlans = JSON.parse(localStorage.getItem('crm_today_plans_v32') || 'null') || {};
+let cellComments = JSON.parse(localStorage.getItem('crm_cell_comments_v32') || 'null') || {};
+let changeHistory = JSON.parse(localStorage.getItem('crm_change_history_v32') || 'null') || [];
+let selectedRows = new Set();
+
+let channelsData = JSON.parse(localStorage.getItem('crm_channels_v32') || 'null') || JSON.parse(JSON.stringify(DEFAULT_CHANNELS));
+let planData = JSON.parse(localStorage.getItem('crm_plan_data_v32') || 'null') || {};
+let factData = JSON.parse(localStorage.getItem('crm_fact_data_v32') || 'null') || {};
+
+Object.keys(tabsState).forEach(key => {
+    tabsState[key].columns.forEach((c, i) => {
+        if (c.width === undefined) c.width = TABS_CONFIG[key].defaultColumns[i]?.width || 120;
+    });
+});
+
+let currentTab = 'sklad';
+let selectedRowId = null;
+let contextRowId = null;
+let contextColumnKey = null;
+let settingsTabKey = null;
+let analyticsGroupBy = localStorage.getItem('crm_analytics_groupby_v32') || 'seller';
+let tiContextRowId = null;
+let commentContextCell = null;
+let currentPlanFactMonth = new Date().getMonth();
+let currentPlanFactYear = new Date().getFullYear();
+let calendarCurrentDate = new Date();
+
+function saveTabDataKey(k) { localStorage.setItem(`crm_data_${k}_v32`, JSON.stringify(tabsState[k].data)); updateBackupStatus(); }
+function saveTabColumns(k) { localStorage.setItem(`crm_cols_${k}_v32`, JSON.stringify(tabsState[k].columns)); }
+function saveSelectOptions() { localStorage.setItem('crm_select_options_v32', JSON.stringify(selectOptions)); }
+function saveAnalyticsGroupBy() { localStorage.setItem('crm_analytics_groupby_v32', analyticsGroupBy); }
+function saveTrafficData() { localStorage.setItem('crm_traffic_v32', JSON.stringify(trafficData)); }
+function saveEvaluationLinks() { localStorage.setItem('crm_eval_links_v32', JSON.stringify(evaluationLinks)); }
+function saveLinksArchive() { localStorage.setItem('crm_links_archive_v32', JSON.stringify(linksArchive)); }
+function saveCalendarData() { localStorage.setItem('crm_calendar_data_v32', JSON.stringify(calendarData)); }
+function saveTodayPlans() { localStorage.setItem('crm_today_plans_v32', JSON.stringify(todayPlans)); }
+function saveCellComments() { localStorage.setItem('crm_cell_comments_v32', JSON.stringify(cellComments)); }
+function saveChangeHistory() { localStorage.setItem('crm_change_history_v32', JSON.stringify(changeHistory)); }
+function saveChannelsData() { localStorage.setItem('crm_channels_v32', JSON.stringify(channelsData)); }
+function savePlanData() { localStorage.setItem('crm_plan_data_v32', JSON.stringify(planData)); }
+function saveFactData() { localStorage.setItem('crm_fact_data_v32', JSON.stringify(factData)); }
+
+function addHistoryEntry(type, description) {
+    changeHistory.unshift({ time: new Date().toISOString(), type, description });
+    if (changeHistory.length > 500) changeHistory = changeHistory.slice(0, 500);
+    saveChangeHistory();
+    if (currentTab === 'history') renderHistory();
+}
+
+function renderHistory() {
+    const list = document.getElementById('historyList');
+    document.getElementById('historyCount').textContent = changeHistory.length;
+    if (changeHistory.length === 0) {
+        list.innerHTML = '<p style="color:#7f8c8d; text-align:center; padding:20px;">История пуста</p>';
+        return;
+    }
+    const typeLabels = { add: 'Добавление', edit: 'Изменение', delete: 'Удаление', bulk: 'Массовое' };
+    list.innerHTML = changeHistory.map(entry => {
+        const time = new Date(entry.time).toLocaleString('ru-RU', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+        return `<div class="history-item"><div class="history-time">${time}</div><div class="history-action"><span class="history-type ${entry.type}">${typeLabels[entry.type] || entry.type}</span>${entry.description}</div></div>`;
+    }).join('');
+}
+
+function clearHistory() {
+    if (!confirm('Очистить историю?')) return;
+    changeHistory = [];
+    saveChangeHistory();
+    renderHistory();
+    showToast('🗑️ История очищена');
+}
+
+function exportHistory() {
+    if (changeHistory.length === 0) { showToast('История пуста', 'warning'); return; }
+    let csv = 'Дата;Тип;Описание\n';
+    changeHistory.forEach(e => {
+        csv += `"${new Date(e.time).toLocaleString('ru-RU')}";"${e.type}";"${e.description.replace(/"/g, '""')}"\n`;
+    });
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `history_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('📥 История экспортирована');
+}
+
+function updateBackupStatus() {
+    const lastBackup = localStorage.getItem('crm_last_backup_time');
+    const statusEl = document.getElementById('backupStatus');
+    const textEl = document.getElementById('backupStatusText');
+    if (!lastBackup) {
+        statusEl.className = 'backup-status danger';
+        textEl.textContent = '⚠️ Бэкап не создан!';
+    } else {
+        const backupDate = new Date(lastBackup);
+        const hoursDiff = (Date.now() - backupDate) / (1000 * 60 * 60);
+        if (hoursDiff > 24) {
+            statusEl.className = 'backup-status warning';
+            textEl.textContent = `⚠️ Бэкап устарел (${Math.floor(hoursDiff)}ч)`;
+        } else {
+            statusEl.className = 'backup-status';
+            textEl.textContent = `💾 ${backupDate.toLocaleString('ru-RU', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'})}`;
+        }
+    }
+}
+
+function saveFullBackup() {
+    const backup = {
+        version: '32', date: new Date().toISOString(),
+        data: { selectOptions, tabsState, trafficData, evaluationLinks, linksArchive, calendarData, todayPlans, cellComments, changeHistory, channelsData, planData, factData }
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `crm_backup_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    localStorage.setItem('crm_last_backup_time', new Date().toISOString());
+    updateBackupStatus();
+    showToast('💾 Бэкап сохранён!');
+    addHistoryEntry('edit', 'Создан бэкап данных');
+}
+
+function exportToExcel() {
+    const wb = XLSX.utils.book_new();
+    const skladHeaders = ['№', ...tabsState.sklad.columns.map(c => c.label)];
+    const skladData = [skladHeaders];
+    tabsState.sklad.data.forEach((r, i) => {
+        skladData.push([i + 1, ...tabsState.sklad.columns.map(c => r[c.key] || '')]);
+    });
+    const wsSklad = XLSX.utils.aoa_to_sheet(skladData);
+    XLSX.utils.book_append_sheet(wb, wsSklad, 'Склад');
+    XLSX.writeFile(wb, `crm_${new Date().toISOString().split('T')[0]}.xlsx`);
+    showToast('📊 Excel сохранён!');
+    addHistoryEntry('edit', 'Экспорт в Excel');
+}
+
+function exportTrafficToExcel() {
+    const monthValue = document.getElementById('traffic-month').value;
+    const [year, month] = monthValue.split('-').map(Number);
+    const daysInMonth = getDaysInMonth(month - 1, year);
+    const models = selectOptions.model || [];
+    const monthData = trafficData[monthValue] || {};
+    const stats = getSkladStats(monthValue);
+    const wb = XLSX.utils.book_new();
+    const callsHeaders = ['Модель', ...Array.from({length: daysInMonth}, (_, i) => `День ${i+1}`), 'Итого', 'Контракты', '%'];
+    const callsData = [callsHeaders];
+    models.forEach(model => {
+        const md = monthData[model] || { callsAndApps: {}, visits: {} };
+        const row = [model];
+        let total = 0;
+        for (let day = 1; day <= daysInMonth; day++) {
+            const v = md.callsAndApps[String(day).padStart(2, '0')] || 0;
+            row.push(v);
+            total += v;
+        }
+        row.push(total);
+        row.push(stats.calls.byModel[model] || 0);
+        row.push(total > 0 ? ((stats.calls.byModel[model] || 0) / total * 100).toFixed(1) + '%' : '—');
+        callsData.push(row);
+    });
+    const wsCalls = XLSX.utils.aoa_to_sheet(callsData);
+    XLSX.utils.book_append_sheet(wb, wsCalls, 'Звонки');
+    XLSX.writeFile(wb, `traffic_${monthValue}.xlsx`);
+    showToast('📊 Excel экспортирован');
+}
+
+function importFile(event, tabKey) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (ext === 'csv') {
+        importCSV(event, tabKey);
+    } else if (ext === 'xlsx' || ext === 'xls') {
+        const reader = new FileReader();
+        reader.onload = e => {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const wb = XLSX.read(data, { type: 'array' });
+                const ws = wb.Sheets[wb.SheetNames[0]];
+                const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
+                if (json.length < 2) { showToast('Файл пуст', 'error'); return; }
+                const imported = [];
+                for (let i = 1; i < json.length; i++) {
+                    const rowData = json[i];
+                    if (!rowData || rowData.length === 0) continue;
+                    const row = { id: Date.now() + i };
+                    tabsState[tabKey].columns.forEach((c, idx) => {
+                        const val = rowData[idx + 1];
+                        if (val !== undefined) {
+                            if (c.type === 'number') row[c.key] = parseFloat(val) || 0;
+                            else row[c.key] = String(val);
+                        } else row[c.key] = c.default;
+                    });
+                    imported.push(row);
+                }
+                if (imported.length > 0 && confirm(`Импортировать ${imported.length} строк?`)) {
+                    tabsState[tabKey].data = imported;
+                    saveTabDataKey(tabKey);
+                    renderTab(tabKey);
+                    showToast(`📤 Импортировано ${imported.length} строк`);
+                    addHistoryEntry('bulk', `Импорт ${imported.length} строк из Excel`);
+                }
+            } catch (err) { showToast('❌ Ошибка: ' + err.message, 'error'); }
+        };
+        reader.readAsArrayBuffer(file);
+    } else {
+        showToast('Неподдерживаемый формат', 'error');
+    }
+    event.target.value = '';
+}
+
+function performGlobalSearch() {
+    const query = document.getElementById('globalSearchInput').value.toLowerCase().trim();
+    const results = document.getElementById('globalSearchResults');
+    if (!query) { results.innerHTML = ''; results.classList.remove('active'); return; }
+    const found = [];
+    tabsState.sklad.data.forEach(row => {
+        const text = Object.values(row).join(' ').toLowerCase();
+        if (text.includes(query)) {
+            found.push({ tab: 'Склад', tabKey: 'sklad', rowId: row.id, match: highlightMatch(`${row.model || ''} — ${row.client || ''}`, query) });
+        }
+    });
+    if (found.length === 0) {
+        results.innerHTML = '<div class="search-result-item" style="color:#7f8c8d;">Ничего не найдено</div>';
+    } else {
+        results.innerHTML = found.slice(0, 20).map(item => `<div class="search-result-item" onclick="goToSearchResult('${item.tabKey}', ${item.rowId})"><strong style="color:#2a5298;">[${item.tab}]</strong> ${item.match}</div>`).join('');
+    }
+    results.classList.add('active');
+}
+
+function highlightMatch(text, query) {
+    const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    return text.replace(regex, '<span class="highlight">$1</span>');
+}
+
+function goToSearchResult(tabKey, rowId) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelector(`[data-tab="${tabKey}"]`).classList.add('active');
+    document.getElementById(`tab-${tabKey}`).classList.add('active');
+    currentTab = tabKey;
+    if (tabKey === 'traffic') { initTrafficMonth(); renderTrafficTables(); }
+    else if (tabKey === 'calendar') renderCalendar();
+    else if (tabKey === 'history') renderHistory();
+    else renderTab(tabKey);
+    if (rowId && tabKey === 'sklad') {
+        setTimeout(() => {
+            const row = document.querySelector(`#tbody-sklad tr[data-id="${rowId}"]`);
+            if (row) {
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                row.classList.add('search-highlight');
+                setTimeout(() => row.classList.remove('search-highlight'), 3000);
+            }
+        }, 300);
+    }
+    hideSearchResults();
+}
+
+function showSearchResults() {
+    const results = document.getElementById('globalSearchResults');
+    if (results.innerHTML) results.classList.add('active');
+}
+
+function hideSearchResults() { document.getElementById('globalSearchResults').classList.remove('active'); }
+
+function toggleRowSelection(tabKey, id, checkbox) {
+    if (checkbox.checked) selectedRows.add(`${tabKey}_${id}`);
+    else selectedRows.delete(`${tabKey}_${id}`);
+    updateBulkActionsPanel(tabKey);
+}
+
+function toggleAllRows(tabKey, checkbox) {
+    const rows = tabsState[tabKey].data;
+    if (checkbox.checked) rows.forEach(r => selectedRows.add(`${tabKey}_${r.id}`));
+    else rows.forEach(r => selectedRows.delete(`${tabKey}_${r.id}`));
+    renderBody(tabKey);
+    updateBulkActionsPanel(tabKey);
+}
+
+function updateBulkActionsPanel(tabKey) {
+    const panel = document.getElementById(`bulkActions-${tabKey}`);
+    const countEl = document.getElementById(`bulkCount-${tabKey}`);
+    const count = Array.from(selectedRows).filter(s => s.startsWith(`${tabKey}_`)).length;
+    if (count > 0) { panel.classList.add('active'); countEl.textContent = count; }
+    else panel.classList.remove('active');
+}
+
+function clearSelection(tabKey) {
+    tabsState[tabKey].data.forEach(r => selectedRows.delete(`${tabKey}_${r.id}`));
+    renderBody(tabKey);
+    updateBulkActionsPanel(tabKey);
+}
+
+function deleteSelectedRows(tabKey) {
+    const selectedIds = Array.from(selectedRows).filter(s => s.startsWith(`${tabKey}_`)).map(s => parseInt(s.split('_')[1]));
+    if (selectedIds.length === 0) { showToast('Ничего не выбрано', 'warning'); return; }
+    if (!confirm(`Удалить ${selectedIds.length} строк?`)) return;
+    tabsState[tabKey].data = tabsState[tabKey].data.filter(r => !selectedIds.includes(r.id));
+    selectedIds.forEach(id => selectedRows.delete(`${tabKey}_${id}`));
+    saveTabDataKey(tabKey);
+    renderBody(tabKey);
+    updateBulkActionsPanel(tabKey);
+    updateStats(tabKey);
+    showToast(`🗑️ Удалено ${selectedIds.length} строк`);
+    addHistoryEntry('bulk', `Массовое удаление ${selectedIds.length} строк`);
+}
+
+function openBulkDeleteModal(tabKey) {
+    const modelSelect = document.getElementById('bulkDeleteModel');
+    const models = [...new Set(tabsState[tabKey].data.map(r => r.model).filter(Boolean))].sort();
+    modelSelect.innerHTML = '<option value="">Все</option>' + models.map(m => `<option value="${m}">${m}</option>`).join('');
+    updateBulkDeleteCount();
+    document.getElementById('bulkDeleteModal').classList.add('active');
+    ['bulkDeleteStatus', 'bulkDeleteModel', 'bulkDeleteFrom', 'bulkDeleteTo'].forEach(id => {
+        document.getElementById(id).oninput = updateBulkDeleteCount;
+        document.getElementById(id).onchange = updateBulkDeleteCount;
+    });
+}
+
+function updateBulkDeleteCount() {
+    const status = document.getElementById('bulkDeleteStatus').value;
+    const model = document.getElementById('bulkDeleteModel').value;
+    const from = document.getElementById('bulkDeleteFrom').value;
+    const to = document.getElementById('bulkDeleteTo').value;
+    const count = tabsState.sklad.data.filter(r => {
+        if (status && r.status !== status) return false;
+        if (model && r.model !== model) return false;
+        if (from && (!r.dateDkp || r.dateDkp < from)) return false;
+        if (to && (!r.dateDkp || r.dateDkp > to)) return false;
+        return true;
+    }).length;
+    document.getElementById('bulkDeleteCount').textContent = count;
+}
+
+function executeBulkDelete() {
+    const status = document.getElementById('bulkDeleteStatus').value;
+    const model = document.getElementById('bulkDeleteModel').value;
+    const from = document.getElementById('bulkDeleteFrom').value;
+    const to = document.getElementById('bulkDeleteTo').value;
+    const before = tabsState.sklad.data.length;
+    tabsState.sklad.data = tabsState.sklad.data.filter(r => {
+        if (status && r.status !== status) return true;
+        if (model && r.model !== model) return true;
+        if (from && (!r.dateDkp || r.dateDkp < from)) return true;
+        if (to && (!r.dateDkp || r.dateDkp > to)) return true;
+        return false;
+    });
+    const deleted = before - tabsState.sklad.data.length;
+    if (deleted === 0) { showToast('Ничего не удалено', 'warning'); return; }
+    saveTabDataKey('sklad');
+    renderBody('sklad');
+    updateStats('sklad');
+    closeBulkDeleteModal();
+    showToast(`🗑️ Удалено ${deleted} строк`);
+    addHistoryEntry('bulk', `Массовое удаление: ${deleted} строк`);
+}
+
+function closeBulkDeleteModal() { document.getElementById('bulkDeleteModal').classList.remove('active'); }
+
+function printReport() { window.print(); }
+
+function setTrafficDateRange(range) {
+    const now = new Date();
+    let from, to;
+    if (range === 'week') {
+        const dayOfWeek = now.getDay() || 7;
+        from = new Date(now); from.setDate(now.getDate() - dayOfWeek + 1);
+        to = new Date(from); to.setDate(from.getDate() + 6);
+    } else if (range === 'month') {
+        from = new Date(now.getFullYear(), now.getMonth(), 1);
+        to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    } else if (range === 'quarter') {
+        const quarter = Math.floor(now.getMonth() / 3);
+        from = new Date(now.getFullYear(), quarter * 3, 1);
+        to = new Date(now.getFullYear(), quarter * 3 + 3, 0);
+    }
+    document.getElementById('traffic-date-from').value = from.toISOString().split('T')[0];
+    document.getElementById('traffic-date-to').value = to.toISOString().split('T')[0];
+    renderTrafficTables();
+}
+
+function clearTrafficDateRange() {
+    document.getElementById('traffic-date-from').value = '';
+    document.getElementById('traffic-date-to').value = '';
+    renderTrafficTables();
+}
+
+function calculateForecast() {
+    const monthValue = document.getElementById('traffic-month')?.value || new Date().toISOString().slice(0, 7);
+    const [year, month] = monthValue.split('-').map(Number);
+    const daysInMonth = getDaysInMonth(month - 1, year);
+    const today = new Date();
+    const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month - 1;
+    const daysPassed = isCurrentMonth ? today.getDate() : daysInMonth;
+    const skladData = tabsState.sklad?.data || [];
+    let contractsSoFar = 0;
+    skladData.forEach(r => {
+        if (r.status !== 'Продан' || !r.dateDkp) return;
+        const d = new Date(r.dateDkp);
+        if (d.getFullYear() === year && d.getMonth() === month - 1 && d.getDate() <= daysPassed) contractsSoFar++;
+    });
+    const dailyAverage = daysPassed > 0 ? contractsSoFar / daysPassed : 0;
+    const forecastTotal = Math.round(dailyAverage * daysInMonth);
+    let planTotal = 0;
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dayStr = String(day).padStart(2, '0');
+        planTotal += todayPlans[monthValue]?.[dayStr]?.contracts || 0;
+    }
+    const prevMonth = month === 1 ? 12 : month - 1;
+    const prevYear = month === 1 ? year - 1 : year;
+    let prevMonthContracts = 0;
+    skladData.forEach(r => {
+        if (r.status !== 'Продан' || !r.dateDkp) return;
+        const d = new Date(r.dateDkp);
+        if (d.getFullYear() === prevYear && d.getMonth() === prevMonth - 1) prevMonthContracts++;
+    });
+    const trendPct = prevMonthContracts > 0 ? ((contractsSoFar / prevMonthContracts - 1) * 100).toFixed(1) : 0;
+    return { contractsSoFar, daysPassed, daysInMonth, dailyAverage: dailyAverage.toFixed(1), forecastTotal, planTotal, trendPct, isCurrentMonth };
+}
+
+function renderForecast() {
+    const container = document.getElementById('forecast-section');
+    const forecast = calculateForecast();
+    if (!forecast.isCurrentMonth) {
+        container.innerHTML = `<h3>📈 Статистика месяца</h3><div class="forecast-grid"><div class="forecast-item"><div class="label">Всего контрактов</div><div class="value">${forecast.contractsSoFar}</div><div class="sub">за ${forecast.daysInMonth} дней</div></div><div class="forecast-item"><div class="label">Среднее в день</div><div class="value">${forecast.dailyAverage}</div></div></div>`;
+        return;
+    }
+    const daysLeft = forecast.daysInMonth - forecast.daysPassed;
+    const planProgress = forecast.planTotal > 0 ? ((forecast.contractsSoFar / forecast.planTotal) * 100).toFixed(0) : 0;
+    container.innerHTML = `<h3>🔮 Прогноз на ${forecast.daysInMonth} дней</h3><div class="forecast-grid"><div class="forecast-item"><div class="label">Сделано</div><div class="value">${forecast.contractsSoFar}</div><div class="sub">за ${forecast.daysPassed} дн.</div></div><div class="forecast-item"><div class="label">Прогноз</div><div class="value">${forecast.forecastTotal}</div><div class="sub">~${forecast.dailyAverage}/день</div></div><div class="forecast-item"><div class="label">План</div><div class="value">${forecast.planTotal}</div><div class="sub">${planProgress}% выполнено</div></div><div class="forecast-item"><div class="label">Тренд</div><div class="value">${forecast.trendPct > 0 ? '+' : ''}${forecast.trendPct}%</div><div class="sub">vs прошлый месяц</div></div><div class="forecast-item"><div class="label">Осталось</div><div class="value">${daysLeft}</div><div class="sub">дней</div></div></div>`;
+}
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const tabKey = btn.dataset.tab;
+        currentTab = tabKey;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.getElementById(`tab-${tabKey}`).classList.add('active');
+        if (tabKey === 'analytics') renderAnalytics();
+        else if (tabKey === 'traffic') { initTrafficMonth(); renderTrafficTables(); }
+        else if (tabKey === 'calendar') renderCalendar();
+        else if (tabKey === 'history') renderHistory();
+        else if (tabKey === 'planfact') { initPlanFactMonth(); renderPlanFactTable(); }
+        else renderTab(tabKey);
+    });
+});
+
+let stepForm = { currentStep: 0, data: {} };
+const stepFields = [
+    { key: 'model', label: 'Модель', type: 'select', options: 'model' },
+    { key: 'status', label: 'Статус', type: 'select', options: 'status' },
+    { key: 'dateDkp', label: 'Дата ДКП', type: 'date' },
+    { key: 'dateIssued', label: 'Дата выдачи', type: 'date' },
+    { key: 'seller', label: 'Продавец', type: 'select', options: 'seller' },
+    { key: 'client', label: 'Клиент', type: 'text' },
+    { key: 'jok', label: 'ЖОК', type: 'number' },
+    { key: 'j', label: 'Ж', type: 'number' },
+    { key: 'o', label: 'О', type: 'number' },
+    { key: 'k', label: 'К', type: 'number' },
+    { key: 'risk', label: 'РИСК', type: 'select', options: 'risk' },
+    { key: 'kr', label: 'КР', type: 'select', options: 'kr' },
+    { key: 'ti', label: 'ТИ', type: 'select', options: 'ti' },
+    { key: 'review', label: 'Отзывы', type: 'select', options: 'review' },
+    { key: 'traffic', label: 'Трафик', type: 'select', options: 'traffic' },
+    { key: 'comment', label: 'Комментарий', type: 'textarea' }
+];
+
+function openStepForm() { stepForm = { currentStep: 0, data: {} }; document.getElementById('stepFormModal').classList.add('active'); renderStepForm(); }
+function closeStepForm() { document.getElementById('stepFormModal').classList.remove('active'); stepForm = { currentStep: 0, data: {} }; }
+
+function renderStepForm() {
+    const indicator = document.getElementById('stepIndicator');
+    const content = document.getElementById('stepFormContent');
+    const prevBtn = document.getElementById('stepPrevBtn');
+    const nextBtn = document.getElementById('stepNextBtn');
+    const totalSteps = stepFields.length;
+    let dotsHtml = '';
+    for (let i = 0; i < totalSteps; i++) {
+        let cls = 'step-dot';
+        if (i === stepForm.currentStep) cls += ' active';
+        else if (i < stepForm.currentStep) cls += ' done';
+        dotsHtml += `<div class="${cls}"></div>`;
+    }
+    indicator.innerHTML = dotsHtml;
+    const step = stepFields[stepForm.currentStep];
+    const val = stepForm.data[step.key] !== undefined ? stepForm.data[step.key] : (step.type === 'select' ? selectOptions[step.options]?.[0] || '' : (step.type === 'number' ? 0 : ''));
+    let inputHtml = '';
+    if (step.type === 'select') {
+        const opts = (selectOptions[step.options] || []).map(o => `<option value="${o}" ${o === val ? 'selected' : ''}>${o}</option>`).join('');
+        inputHtml = `<select id="stepInput" style="width:100%; padding:8px;">${opts}</select>`;
+    } else if (step.type === 'date') inputHtml = `<input type="date" id="stepInput" value="${val}" style="width:100%; padding:8px;">`;
+    else if (step.type === 'number') inputHtml = `<input type="number" id="stepInput" value="${val}" style="width:100%; padding:8px;">`;
+    else if (step.type === 'textarea') inputHtml = `<textarea id="stepInput" style="width:100%; padding:8px; min-height:80px;">${val}</textarea>`;
+    else inputHtml = `<input type="text" id="stepInput" value="${val}" style="width:100%; padding:8px;">`;
+    content.innerHTML = `<div class="step-form"><div class="step-title">Шаг ${stepForm.currentStep + 1} из ${totalSteps}: ${step.label}</div><div>${inputHtml}</div></div>`;
+    setTimeout(() => { const input = document.getElementById('stepInput'); if (input) input.focus(); }, 100);
+    prevBtn.style.display = stepForm.currentStep > 0 ? 'inline-block' : 'none';
+    nextBtn.textContent = stepForm.currentStep === totalSteps - 1 ? '✅ Сохранить' : 'Далее →';
+}
+
+function stepFormNext() {
+    const step = stepFields[stepForm.currentStep];
+    const input = document.getElementById('stepInput');
+    if (!input) return;
+    if (step.type === 'number') stepForm.data[step.key] = parseFloat(input.value) || 0;
+    else stepForm.data[step.key] = input.value;
+    if (stepForm.currentStep < stepFields.length - 1) {
+        stepForm.currentStep++;
+        renderStepForm();
+    } else {
+        const st = tabsState.sklad;
+        const newRow = { id: Date.now() };
+        st.columns.forEach(c => { newRow[c.key] = stepForm.data[c.key] !== undefined ? stepForm.data[c.key] : c.default; });
+        st.data.push(newRow);
+        saveTabDataKey('sklad');
+        renderBody('sklad');
+        updateStats('sklad');
+        closeStepForm();
+        showToast('✅ Сделка добавлена!');
+        addHistoryEntry('add', `Добавлена сделка: ${newRow.model} — ${newRow.client}`);
+    }
+}
+
+function stepFormPrev() { if (stepForm.currentStep > 0) { stepForm.currentStep--; renderStepForm(); } }
+
+function openLinkModal(rowId) {
+    tiContextRowId = rowId;
+    const row = tabsState.sklad.data.find(r => r.id === rowId);
+    if (!row) return;
+    document.getElementById('linkModalInfo').textContent = `${row.model || '—'} | ${row.client || '—'} | ТИ: ${row.ti || 0}`;
+    document.getElementById('linkModalInput').value = evaluationLinks[rowId] || '';
+    document.getElementById('linkModal').classList.add('active');
+    setTimeout(() => document.getElementById('linkModalInput').focus(), 100);
+}
+
+function closeLinkModal() { document.getElementById('linkModal').classList.remove('active'); tiContextRowId = null; }
+
+function saveLink() {
+    if (!tiContextRowId) return;
+    const input = document.getElementById('linkModalInput');
+    let url = input.value.trim();
+    if (!url) { showToast('Введите URL', 'error'); return; }
+    if (!url.startsWith('http://') && !url.startsWith('https://')) url = 'https://' + url;
+    evaluationLinks[tiContextRowId] = url;
+    saveEvaluationLinks();
+    closeLinkModal();
+    renderBody('sklad');
+    showToast('🔗 Ссылка сохранена');
+    addHistoryEntry('edit', `Добавлена ссылка для ${tabsState.sklad.data.find(r => r.id === tiContextRowId)?.model}`);
+}
+
+function openEvaluationLink(rowId) {
+    const url = evaluationLinks[rowId];
+    if (!url) { showToast('Ссылка не добавлена', 'error'); return; }
+    window.open(url, '_blank');
+}
+
+function removeEvaluationLink(rowId) {
+    if (!evaluationLinks[rowId]) return;
+    if (!confirm('Удалить ссылку?')) return;
+    delete evaluationLinks[rowId];
+    saveEvaluationLinks();
+    renderBody('sklad');
+    showToast('🗑️ Ссылка удалена');
+}
+
+function showTiContextMenu(event, rowId) {
+    event.preventDefault();
+    event.stopPropagation();
+    tiContextRowId = rowId;
+    const hasLink = !!evaluationLinks[rowId];
+    const menu = document.getElementById('tiContextMenu');
+    menu.querySelectorAll('.context-menu-item').forEach(item => {
+        const action = item.dataset.action;
+        if (action === 'addLink') item.style.display = hasLink ? 'none' : 'block';
+        else if (['editLink', 'openLink', 'removeLink'].includes(action)) item.style.display = hasLink ? 'block' : 'none';
+    });
+    menu.style.left = event.pageX + 'px';
+    menu.style.top = event.pageY + 'px';
+    menu.classList.add('active');
+}
+
+document.querySelectorAll('#tiContextMenu .context-menu-item').forEach(item => {
+    item.onclick = () => {
+        const action = item.dataset.action;
+        if (!tiContextRowId) return;
+        if (action === 'addLink' || action === 'editLink') openLinkModal(tiContextRowId);
+        else if (action === 'openLink') openEvaluationLink(tiContextRowId);
+        else if (action === 'removeLink') removeEvaluationLink(tiContextRowId);
+        hideContextMenu();
+    };
+});
+
+function showCommentContextMenu(event, cellKey) {
+    event.preventDefault();
+    event.stopPropagation();
+    commentContextCell = cellKey;
+    const hasComment = !!cellComments[cellKey];
+    const menu = document.getElementById('commentContextMenu');
+    menu.querySelectorAll('.context-menu-item').forEach(it => {
+        const action = it.dataset.action;
+        if (action === 'addComment') it.style.display = hasComment ? 'none' : 'block';
+        else if (['editComment', 'removeComment'].includes(action)) it.style.display = hasComment ? 'block' : 'none';
+    });
+    menu.style.left = event.pageX + 'px';
+    menu.style.top = event.pageY + 'px';
+    menu.classList.add('active');
+}
+
+function addOrEditComment() {
+    if (!commentContextCell) return;
+    const current = cellComments[commentContextCell] || '';
+    const text = prompt('Комментарий:', current);
+    if (text === null) return;
+    if (text.trim()) cellComments[commentContextCell] = text.trim();
+    else delete cellComments[commentContextCell];
+    saveCellComments();
+    renderTrafficTables();
+    hideContextMenu();
+}
+
+function removeComment() {
+    if (!commentContextCell) return;
+    if (!confirm('Удалить комментарий?')) return;
+    delete cellComments[commentContextCell];
+    saveCellComments();
+    renderTrafficTables();
+    hideContextMenu();
+}
+
+document.querySelectorAll('#commentContextMenu .context-menu-item').forEach(item => {
+    item.onclick = () => {
+        const action = item.dataset.action;
+        if (action === 'addComment' || action === 'editComment') addOrEditComment();
+        else if (action === 'removeComment') removeComment();
+    };
+});
+
+function showLinksArchive() {
+    const list = document.getElementById('linksArchiveList');
+    const entries = Object.entries(linksArchive);
+    if (entries.length === 0) list.innerHTML = '<p style="color:#7f8c8d; text-align:center; padding:20px;">Архив пуст</p>';
+    else list.innerHTML = entries.map(([id, data]) => `<div style="padding:10px; border-bottom:1px solid #eee;"><div style="font-weight:600;">${data.model || '—'} — ${data.client || '—'}</div><div style="font-size:10px; color:#7f8c8d;">Удалено: ${new Date(data.deletedAt).toLocaleString('ru-RU')}</div><a href="${data.url}" target="_blank" style="font-size:11px; color:#1a73e8;">${data.url}</a></div>`).join('');
+    document.getElementById('linksArchiveModal').classList.add('active');
+}
+
+function closeLinksArchive() { document.getElementById('linksArchiveModal').classList.remove('active'); }
+
+function clearLinksArchive() {
+    if (!confirm('Очистить архив?')) return;
+    linksArchive = {};
+    saveLinksArchive();
+    showLinksArchive();
+}
+
+function initTrafficMonth() {
+    const monthInput = document.getElementById('traffic-month');
+    if (!monthInput.value) {
+        const now = new Date();
+        monthInput.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    }
+}
+
+function getDaysInMonth(month, year) { return new Date(year, month + 1, 0).getDate(); }
+
+function getDayName(year, month, day) { return ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'][new Date(year, month - 1, day).getDay()]; }
+
+function getWeeksOfMonth(year, month) {
+    const daysInMonth = getDaysInMonth(month - 1, year);
+    const weeks = [];
+    let currentWeek = { days: [] };
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dayOfWeek = new Date(year, month - 1, day).getDay();
+        const isMonday = dayOfWeek === 1 || day === 1;
+        if (isMonday && currentWeek.days.length > 0) { weeks.push(currentWeek); currentWeek = { days: [] }; }
+        currentWeek.days.push(day);
+    }
+    if (currentWeek.days.length > 0) weeks.push(currentWeek);
+    return weeks;
+}
+
+function ensureModelData(monthValue, model) {
+    if (!trafficData[monthValue]) trafficData[monthValue] = {};
+    if (!trafficData[monthValue][model]) trafficData[monthValue][model] = { callsAndApps: {}, visits: {} };
+    return trafficData[monthValue][model];
+}
+
+function getSkladStats(monthValue) {
+    const skladData = tabsState.sklad?.data || [];
+    const calls = { byModel: {}, total: 0 };
+    const callsStrike = { byModel: {}, total: 0 };
+    const visits = { byModel: {}, total: 0 };
+    const visitsStrike = { byModel: {}, total: 0 };
+    skladData.forEach(r => {
+        if (!r.dateDkp || !r.dateDkp.startsWith(monthValue)) return;
+        const model = r.model || 'Не указано';
+        const traffic = r.traffic || '';
+        const status = r.status;
+        const isCallOrApp = traffic.includes('Звонок') || traffic.includes('Заявка');
+        const isVisit = traffic.includes('Визит');
+        if (status === 'Продан') {
+            if (isCallOrApp) { if (!calls.byModel[model]) calls.byModel[model] = 0; calls.byModel[model]++; calls.total++; }
+            else if (isVisit) { if (!visits.byModel[model]) visits.byModel[model] = 0; visits.byModel[model]++; visits.total++; }
+        } else if (status === 'Отказ') {
+            if (isCallOrApp) { if (!callsStrike.byModel[model]) callsStrike.byModel[model] = 0; callsStrike.byModel[model]++; callsStrike.total++; }
+            else if (isVisit) { if (!visitsStrike.byModel[model]) visitsStrike.byModel[model] = 0; visitsStrike.byModel[model]++; visitsStrike.total++; }
+        }
+    });
+    return { calls, callsStrike, visits, visitsStrike };
+}
+
+function getContractsByDay(monthValue, trafficFilter) {
+    const skladData = tabsState.sklad?.data || [];
+    const [year, month] = monthValue.split('-').map(Number);
+    const daysInMonth = getDaysInMonth(month - 1, year);
+    const result = {};
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dayStr = String(day).padStart(2, '0');
+        const dateStr = `${monthValue}-${dayStr}`;
+        result[dayStr] = 0;
+        skladData.forEach(r => {
+            if (r.status !== 'Продан' || !r.dateDkp) return;
+            if (r.dateDkp === dateStr) {
+                const traffic = r.traffic || '';
+                if (trafficFilter === 'all') result[dayStr]++;
+                else if (trafficFilter === 'calls' && (traffic.includes('Звонок') || traffic.includes('Заявка'))) result[dayStr]++;
+                else if (trafficFilter === 'visits' && traffic.includes('Визит')) result[dayStr]++;
+            }
+        });
+    }
+    return result;
+}
+
+function renderTrafficTables() {
+    const monthInput = document.getElementById('traffic-month');
+    const monthValue = monthInput.value;
+    if (!monthValue) return;
+    const [year, month] = monthValue.split('-').map(Number);
+    const daysInMonth = getDaysInMonth(month - 1, year);
+    const models = selectOptions.model || [];
+    const stats = getSkladStats(monthValue);
+    const weeks = getWeeksOfMonth(year, month);
+    models.forEach(model => ensureModelData(monthValue, model));
+    const callsContractsByDay = getContractsByDay(monthValue, 'calls');
+    const visitsContractsByDay = getContractsByDay(monthValue, 'visits');
+    const totalContractsByDay = getContractsByDay(monthValue, 'all');
+    renderForecast();
+    renderCallsTable(monthValue, year, month, daysInMonth, models, stats, callsContractsByDay);
+    renderCallsWeeks(year, month, weeks, models, stats);
+    renderVisitsTable(monthValue, year, month, daysInMonth, models, stats, visitsContractsByDay);
+    renderVisitsWeeks(year, month, weeks, models, stats);
+    renderTotalTable(monthValue, year, month, daysInMonth, models, totalContractsByDay);
+    renderTrafficHeaderKPI(models, stats);
+    updateTrafficStats(stats);
+}
+
+function renderCallsTable(monthValue, year, month, daysInMonth, models, stats, contractsByDay) {
+    const thead = document.getElementById('calls-thead');
+    const tbody = document.getElementById('calls-tbody');
+    let headerHtml = '<tr><th class="model-header" rowspan="2">Модель</th>';
+    headerHtml += `<th colspan="${daysInMonth}" style="background:#667eea;">📞 Звонки + Заявки</th>`;
+    headerHtml += '<th class="summary-header" rowspan="2">Итого</th>';
+    headerHtml += '<th class="contract-header" rowspan="2">📄 Контр.</th>';
+    headerHtml += '<th class="strike-header" rowspan="2">% Контр.</th>';
+    headerHtml += '</tr><tr>';
+    for (let day = 1; day <= daysInMonth; day++) {
+        headerHtml += `<th class="day-header"><span class="day-num">${day}</span><span class="day-name">${getDayName(year, month, day)}</span></th>`;
+    }
+    headerHtml += '</tr>';
+    thead.innerHTML = headerHtml;
+    let bodyHtml = '';
+    const totals = { callsAndApps: {}, totalCallsApps: 0, totalContracts: 0 };
+    models.forEach(model => {
+        const modelData = ensureModelData(monthValue, model);
+        let totalCallsApps = 0;
+        const modelContracts = stats.calls.byModel[model] || 0;
+        bodyHtml += `<tr><td class="model-cell">${model}</td>`;
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dayStr = String(day).padStart(2, '0');
+            const value = modelData.callsAndApps[dayStr] || 0;
+            totalCallsApps += value;
+            if (!totals.callsAndApps[dayStr]) totals.callsAndApps[dayStr] = 0;
+            totals.callsAndApps[dayStr] += value;
+            const commentKey = `calls_${dayStr}_${model}`;
+            const hasComment = !!cellComments[commentKey];
+            const commentText = cellComments[commentKey] || '';
+            bodyHtml += `<td class="day-cell ${hasComment ? 'has-comment' : ''}" contenteditable="true" data-table="calls" data-model="${model}" data-day="${dayStr}" data-comment-key="${commentKey}" onblur="updateTrafficCell(this)" oncontextmenu="showCommentContextMenu(event, '${commentKey}')" title="${commentText.replace(/"/g, '&quot;')}">${value}</td>`;
+        }
+        bodyHtml += `<td class="summary-cell">${totalCallsApps}</td>`;
+        bodyHtml += `<td class="contract-cell">${modelContracts}</td>`;
+        const pct = totalCallsApps > 0 ? ((modelContracts / totalCallsApps) * 100).toFixed(1) + '%' : '—';
+        const strikeClass = totalCallsApps > 0 && (modelContracts / totalCallsApps) >= 0.5 ? 'strike-cell positive' : 'strike-cell';
+        bodyHtml += `<td class="${strikeClass}">${pct}</td>`;
+        bodyHtml += '</tr>';
+        totals.totalCallsApps += totalCallsApps;
+        totals.totalContracts += modelContracts;
+    });
+    bodyHtml += '<tr class="total-row"><td class="model-cell">ИТОГО</td>';
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dayStr = String(day).padStart(2, '0');
+        bodyHtml += `<td class="total-cell">${totals.callsAndApps[dayStr] || 0}</td>`;
+    }
+    bodyHtml += `<td class="total-cell">${totals.totalCallsApps}</td>`;
+    bodyHtml += `<td class="total-cell contract-total">${totals.totalContracts}</td>`;
+    const totalPct = totals.totalCallsApps > 0 ? ((totals.totalContracts / totals.totalCallsApps) * 100).toFixed(1) + '%' : '—';
+    const totalClass = totals.totalCallsApps > 0 && (totals.totalContracts / totals.totalCallsApps) >= 0.5 ? 'total-cell strike-total positive' : 'total-cell strike-total';
+    bodyHtml += `<td class="${totalClass}">${totalPct}</td>`;
+    bodyHtml += '</tr>';
+    if (!todayPlans[monthValue]) todayPlans[monthValue] = {};
+    bodyHtml += '<tr><td class="plan-label">📅 План встреч</td>';
+    let totalMeetings = 0;
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dayStr = String(day).padStart(2, '0');
+        const dayPlan = todayPlans[monthValue][dayStr] || { meetings: 0, contracts: 0 };
+        totalMeetings += dayPlan.meetings || 0;
+        bodyHtml += `<td class="plan-cell"><input type="number" value="${dayPlan.meetings || 0}" onchange="updateDayPlan('${monthValue}', '${dayStr}', 'meetings', this.value)"></td>`;
+    }
+    bodyHtml += `<td class="plan-total">${totalMeetings}</td>`;
+    bodyHtml += '<td colspan="2" style="background:#f3e5f5;"></td>';
+    bodyHtml += '</tr>';
+    bodyHtml += '<tr><td class="plan-label">📋 План контрактов</td>';
+    let totalContractsPlan = 0;
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dayStr = String(day).padStart(2, '0');
+        const dayPlan = todayPlans[monthValue][dayStr] || { meetings: 0, contracts: 0 };
+        totalContractsPlan += dayPlan.contracts || 0;
+        bodyHtml += `<td class="plan-cell"><input type="number" value="${dayPlan.contracts || 0}" onchange="updateDayPlan('${monthValue}', '${dayStr}', 'contracts', this.value)"></td>`;
+    }
+    bodyHtml += `<td class="plan-total">${totalContractsPlan}</td>`;
+    bodyHtml += '<td colspan="2" style="background:#f3e5f5;"></td>';
+    bodyHtml += '</tr>';
+    bodyHtml += '<tr><td class="contracts-label">📄 Контракты (Зв+Заявки)</td>';
+    let totalContractsDay = 0;
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dayStr = String(day).padStart(2, '0');
+        const v = contractsByDay[dayStr] || 0;
+        totalContractsDay += v;
+        bodyHtml += `<td class="contracts-cell">${v}</td>`;
+    }
+    bodyHtml += `<td class="contracts-total">${totalContractsDay}</td>`;
+    bodyHtml += '<td colspan="2" style="background:#fff8e1;"></td>';
+    bodyHtml += '</tr>';
+    tbody.innerHTML = bodyHtml;
+}
+
+function renderVisitsTable(monthValue, year, month, daysInMonth, models, stats, contractsByDay) {
+    const thead = document.getElementById('visits-thead');
+    const tbody = document.getElementById('visits-tbody');
+    let headerHtml = '<tr><th class="model-header" rowspan="2">Модель</th>';
+    headerHtml += `<th colspan="${daysInMonth}" style="background:#11998e;">🚶 Визиты</th>`;
+    headerHtml += '<th class="summary-header" rowspan="2">Итого</th>';
+    headerHtml += '<th class="contract-header" rowspan="2">📄 Контр.</th>';
+    headerHtml += '<th class="strike-header" rowspan="2">% Контр.</th>';
+    headerHtml += '</tr><tr>';
+    for (let day = 1; day <= daysInMonth; day++) {
+        headerHtml += `<th class="day-header"><span class="day-num">${day}</span><span class="day-name">${getDayName(year, month, day)}</span></th>`;
+    }
+    headerHtml += '</tr>';
+    thead.innerHTML = headerHtml;
+    let bodyHtml = '';
+    const totals = { visits: {}, totalVisits: 0, totalContracts: 0 };
+    models.forEach(model => {
+        const modelData = ensureModelData(monthValue, model);
+        let totalVisits = 0;
+        const modelContracts = stats.visits.byModel[model] || 0;
+        bodyHtml += `<tr><td class="model-cell">${model}</td>`;
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dayStr = String(day).padStart(2, '0');
+            const value = modelData.visits[dayStr] || 0;
+            totalVisits += value;
+            if (!totals.visits[dayStr]) totals.visits[dayStr] = 0;
+            totals.visits[dayStr] += value;
+            const commentKey = `visits_${dayStr}_${model}`;
+            const hasComment = !!cellComments[commentKey];
+            const commentText = cellComments[commentKey] || '';
+            bodyHtml += `<td class="day-cell ${hasComment ? 'has-comment' : ''}" contenteditable="true" data-table="visits" data-model="${model}" data-day="${dayStr}" data-comment-key="${commentKey}" onblur="updateTrafficCell(this)" oncontextmenu="showCommentContextMenu(event, '${commentKey}')" title="${commentText.replace(/"/g, '&quot;')}">${value}</td>`;
+        }
+        bodyHtml += `<td class="summary-cell">${totalVisits}</td>`;
+        bodyHtml += `<td class="contract-cell">${modelContracts}</td>`;
+        const pct = totalVisits > 0 ? ((modelContracts / totalVisits) * 100).toFixed(1) + '%' : '—';
+        const strikeClass = totalVisits > 0 && (modelContracts / totalVisits) >= 0.5 ? 'strike-cell positive' : 'strike-cell';
+        bodyHtml += `<td class="${strikeClass}">${pct}</td>`;
+        bodyHtml += '</tr>';
+        totals.totalVisits += totalVisits;
+        totals.totalContracts += modelContracts;
+    });
+    bodyHtml += '<tr class="total-row"><td class="model-cell">ИТОГО</td>';
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dayStr = String(day).padStart(2, '0');
+        bodyHtml += `<td class="total-cell">${totals.visits[dayStr] || 0}</td>`;
+    }
+    bodyHtml += `<td class="total-cell">${totals.totalVisits}</td>`;
+    bodyHtml += `<td class="total-cell contract-total">${totals.totalContracts}</td>`;
+    const totalPct = totals.totalVisits > 0 ? ((totals.totalContracts / totals.totalVisits) * 100).toFixed(1) + '%' : '—';
+    const totalClass = totals.totalVisits > 0 && (totals.totalContracts / totals.totalVisits) >= 0.5 ? 'total-cell strike-total positive' : 'total-cell strike-total';
+    bodyHtml += `<td class="${totalClass}">${totalPct}</td>`;
+    bodyHtml += '</tr>';
+    bodyHtml += '<tr><td class="contracts-label">📄 Контракты (Визиты)</td>';
+    let totalContractsDay = 0;
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dayStr = String(day).padStart(2, '0');
+        const v = contractsByDay[dayStr] || 0;
+        totalContractsDay += v;
+        bodyHtml += `<td class="contracts-cell">${v}</td>`;
+    }
+    bodyHtml += `<td class="contracts-total">${totalContractsDay}</td>`;
+    bodyHtml += '<td colspan="2" style="background:#fff8e1;"></td>';
+    bodyHtml += '</tr>';
+    tbody.innerHTML = bodyHtml;
+}
+
+function renderTotalTable(monthValue, year, month, daysInMonth, models, contractsByDay) {
+    const thead = document.getElementById('total-thead');
+    const tbody = document.getElementById('total-tbody');
+    let headerHtml = '<tr><th class="model-header">Показатель</th>';
+    for (let day = 1; day <= daysInMonth; day++) {
+        headerHtml += `<th class="day-header"><span class="day-num">${day}</span><span class="day-name">${getDayName(year, month, day)}</span></th>`;
+    }
+    headerHtml += '<th class="summary-header">Итого</th>';
+    headerHtml += '</tr>';
+    thead.innerHTML = headerHtml;
+    let bodyHtml = '';
+    bodyHtml += '<tr><td class="bank-label">💼 Общий банк</td>';
+    let totalBank = 0;
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dayStr = String(day).padStart(2, '0');
+        const v = contractsByDay[dayStr] || 0;
+        totalBank += v;
+        bodyHtml += `<td class="bank-cell">${v}</td>`;
+    }
+    bodyHtml += `<td class="bank-total">${totalBank}</td>`;
+    bodyHtml += '</tr>';
+    if (!todayPlans[monthValue]) todayPlans[monthValue] = {};
+    bodyHtml += '<tr><td class="plan-label">📋 План</td>';
+    let totalPlan = 0;
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dayStr = String(day).padStart(2, '0');
+        const v = todayPlans[monthValue][dayStr]?.contracts || 0;
+        totalPlan += v;
+        bodyHtml += `<td class="plan-cell" style="background:#fce4ec;"><input type="number" value="${v}" onchange="updateDayPlan('${monthValue}', '${dayStr}', 'contracts', this.value)"></td>`;
+    }
+    bodyHtml += `<td class="plan-total">${totalPlan}</td>`;
+    bodyHtml += '</tr>';
+    bodyHtml += '<tr><td class="bank-label">📊 Выполнение</td>';
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dayStr = String(day).padStart(2, '0');
+        const fact = contractsByDay[dayStr] || 0;
+        const plan = todayPlans[monthValue][dayStr]?.contracts || 0;
+        const pct = plan > 0 ? ((fact / plan) * 100).toFixed(0) + '%' : '—';
+        bodyHtml += `<td class="bank-cell">${pct}</td>`;
+    }
+    const totalPct = totalPlan > 0 ? ((totalBank / totalPlan) * 100).toFixed(0) + '%' : '—';
+    bodyHtml += `<td class="bank-total">${totalPct}</td>`;
+    bodyHtml += '</tr>';
+    tbody.innerHTML = bodyHtml;
+}
+
+function updateDayPlan(monthKey, dayStr, field, value) {
+    if (!todayPlans[monthKey]) todayPlans[monthKey] = {};
+    if (!todayPlans[monthKey][dayStr]) todayPlans[monthKey][dayStr] = { meetings: 0, contracts: 0 };
+    todayPlans[monthKey][dayStr][field] = parseInt(value) || 0;
+    saveTodayPlans();
+    renderTrafficTables();
+}
+
+function renderCallsWeeks(year, month, weeks, models, stats) {
+    const container = document.getElementById('calls-weeks');
+    const monthValue = `${year}-${String(month).padStart(2, '0')}`;
+    let html = '';
+    weeks.forEach((week, i) => {
+        let trafficSum = 0;
+        week.days.forEach(day => {
+            const dayStr = String(day).padStart(2, '0');
+            models.forEach(model => {
+                const md = ensureModelData(monthValue, model);
+                trafficSum += md.callsAndApps[dayStr] || 0;
+            });
+        });
+        const weekContracts = getSkladWeekContracts(year, month, week.days);
+        html += `<div class="week-block"><div class="week-title">Неделя ${i + 1}</div><div class="week-traffic">📞 ${trafficSum}</div><div class="week-contracts">📄 ${weekContracts}</div></div>`;
+    });
+    container.innerHTML = html;
+}
+
+function renderVisitsWeeks(year, month, weeks, models, stats) {
+    const container = document.getElementById('visits-weeks');
+    const monthValue = `${year}-${String(month).padStart(2, '0')}`;
+    let html = '';
+    weeks.forEach((week, i) => {
+        let trafficSum = 0;
+        week.days.forEach(day => {
+            const dayStr = String(day).padStart(2, '0');
+            models.forEach(model => {
+                const md = ensureModelData(monthValue, model);
+                trafficSum += md.visits[dayStr] || 0;
+            });
+        });
+        const weekContracts = getSkladWeekContractsVisit(year, month, week.days);
+        html += `<div class="week-block"><div class="week-title">Неделя ${i + 1}</div><div class="week-traffic">🚶 ${trafficSum}</div><div class="week-contracts">📄 ${weekContracts}</div></div>`;
+    });
+    container.innerHTML = html;
+}
+
+function getSkladWeekContracts(year, month, days) {
+    const skladData = tabsState.sklad?.data || [];
+    let count = 0;
+    skladData.forEach(r => {
+        if (r.status !== 'Продан' || !r.dateDkp) return;
+        const d = new Date(r.dateDkp);
+        if (d.getFullYear() === year && d.getMonth() === month - 1 && days.includes(d.getDate())) {
+            const traffic = r.traffic || '';
+            if (traffic.includes('Звонок') || traffic.includes('Заявка')) count++;
+        }
+    });
+    return count;
+}
+
+function getSkladWeekContractsVisit(year, month, days) {
+    const skladData = tabsState.sklad?.data || [];
+    let count = 0;
+    skladData.forEach(r => {
+        if (r.status !== 'Продан' || !r.dateDkp) return;
+        const d = new Date(r.dateDkp);
+        if (d.getFullYear() === year && d.getMonth() === month - 1 && days.includes(d.getDate())) {
+            if ((r.traffic || '').includes('Визит')) count++;
+        }
+    });
+    return count;
+}
+
+function updateTrafficCell(td) {
+    const monthValue = document.getElementById('traffic-month').value;
+    const model = td.dataset.model;
+    const value = parseInt(td.textContent) || 0;
+    const table = td.dataset.table;
+    const day = td.dataset.day;
+    const modelData = ensureModelData(monthValue, model);
+    if (table === 'calls') modelData.callsAndApps[day] = value;
+    else if (table === 'visits') modelData.visits[day] = value;
+    saveTrafficData();
+    renderTrafficTables();
+}
+
+function renderTrafficHeaderKPI(models, stats) {
+    const kpiBar = document.getElementById('traffic-header-kpi');
+    const monthValue = document.getElementById('traffic-month').value;
+    const monthData = trafficData[monthValue] || {};
+    let totalCallsApps = 0, totalVisits = 0;
+    models.forEach(model => {
+        const md = monthData[model] || { callsAndApps: {}, visits: {} };
+        Object.values(md.callsAndApps || {}).forEach(v => totalCallsApps += v);
+        Object.values(md.visits || {}).forEach(v => totalVisits += v);
+    });
+    const callsPct = totalCallsApps > 0 ? ((stats.calls.total / totalCallsApps) * 100).toFixed(1) + '%' : '—';
+    const visitsPct = totalVisits > 0 ? ((stats.visits.total / totalVisits) * 100).toFixed(1) + '%' : '—';
+    kpiBar.innerHTML = `<div class="kpi-title">📊 Сводка по трафику</div><div class="kpi-row"><div class="kpi-block calls"><div class="block-title">📞 Звонки и Заявки</div><div class="block-stats"><div class="stat-item"><div class="stat-label">Всего</div><div class="stat-value">${totalCallsApps}</div></div><div class="stat-item"><div class="stat-label">Контракты</div><div class="stat-value contracts">${stats.calls.total}</div></div><div class="stat-item"><div class="stat-label">Отказы</div><div class="stat-value strike">${stats.callsStrike.total}</div></div><div class="stat-item"><div class="stat-label">%</div><div class="stat-value percent">${callsPct}</div></div></div></div><div class="kpi-block visits"><div class="block-title">🚶 Визиты</div><div class="block-stats"><div class="stat-item"><div class="stat-label">Всего</div><div class="stat-value">${totalVisits}</div></div><div class="stat-item"><div class="stat-label">Контракты</div><div class="stat-value contracts">${stats.visits.total}</div></div><div class="stat-item"><div class="stat-label">Отказы</div><div class="stat-value strike">${stats.visitsStrike.total}</div></div><div class="stat-item"><div class="stat-label">%</div><div class="stat-value percent">${visitsPct}</div></div></div></div></div>`;
+}
+
+function updateTrafficStats(stats) {
+    const monthValue = document.getElementById('traffic-month').value;
+    const [year, month] = monthValue.split('-').map(Number);
+    const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+    const monthData = trafficData[monthValue] || {};
+    let totalCallsApps = 0, totalVisits = 0;
+    Object.values(monthData).forEach(modelData => {
+        Object.values(modelData.callsAndApps || {}).forEach(v => totalCallsApps += v);
+        Object.values(modelData.visits || {}).forEach(v => totalVisits += v);
+    });
+    document.getElementById('stats-traffic').innerHTML = `📅 <b>${monthNames[month - 1]} ${year}</b> | 📞 Зв+Заявки: <b>${totalCallsApps}</b> | 📄 Контр: <b>${stats.calls.total}</b> | ⚡ Отказы: <b>${stats.callsStrike.total}</b> | 🚶 Визиты: <b>${totalVisits}</b>`;
+}
+
+function exportTrafficCSV() {
+    const monthValue = document.getElementById('traffic-month').value;
+    if (!monthValue) { showToast('Выберите месяц', 'error'); return; }
+    const [year, month] = monthValue.split('-').map(Number);
+    const daysInMonth = getDaysInMonth(month - 1, year);
+    const models = selectOptions.model || [];
+    const monthData = trafficData[monthValue] || {};
+    const stats = getSkladStats(monthValue);
+    let csv = 'ТРАФИК - ' + monthValue + '\n\nЗВОНКИ\nМодель';
+    for (let day = 1; day <= daysInMonth; day++) csv += `;День ${day}`;
+    csv += ';Итого;Контракты;%\n';
+    models.forEach(model => {
+        const md = monthData[model] || { callsAndApps: {}, visits: {} };
+        csv += model;
+        let total = 0;
+        for (let day = 1; day <= daysInMonth; day++) {
+            const v = md.callsAndApps[String(day).padStart(2, '0')] || 0;
+            csv += `;${v}`;
+            total += v;
+        }
+        const pct = total > 0 ? ((stats.calls.byModel[model] || 0) / total * 100).toFixed(1) + '%' : '—';
+        csv += `;${total};${stats.calls.byModel[model] || 0};${pct}\n`;
+    });
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `traffic_${monthValue}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('📥 CSV скачан');
+}
+
+function initPlanFactMonth() {
+    const select = document.getElementById('planfact-month');
+    if (select.options.length === 0) {
+        const now = new Date();
+        for (let i = 0; i < 12; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.textContent = `${MONTHS[i]} ${now.getFullYear()}`;
+            if (i === now.getMonth()) option.selected = true;
+            select.appendChild(option);
+        }
+    }
+}
+
+function renderPlanFactTable() {
+    currentPlanFactMonth = parseInt(document.getElementById('planfact-month').value);
+    const daysInMonth = getDaysInMonth(currentPlanFactMonth, currentPlanFactYear);
+    const monthKey = `${currentPlanFactYear}-${String(currentPlanFactMonth + 1).padStart(2, '0')}`;
+    if (!planData[monthKey]) {
+        planData[monthKey] = {};
+        channelsData.forEach(ch => {
+            planData[monthKey][ch.name] = { days: {}, budget: ch.budget, cpl: ch.cpl, rl: ch.rl, sr: ch.sr };
+            for (let day = 1; day <= daysInMonth; day++) planData[monthKey][ch.name].days[day] = 0;
+        });
+        savePlanData();
+    }
+    if (!factData[monthKey]) { factData[monthKey] = { contracts: 0, issued: 0 }; saveFactData(); }
+    renderPlanFactHeader(daysInMonth);
+    renderPlanFactBody(daysInMonth, monthKey);
+}
+
+function renderPlanFactHeader(daysInMonth) {
+    const thead = document.getElementById('planfact-thead');
+    let html = '<tr>';
+    html += '<th rowspan="2" style="min-width:160px; position:sticky; left:0; z-index:11; background:#1e3c72;">Канал</th>';
+    html += '<th rowspan="2" class="sub-header">Бюджет</th>';
+    html += '<th rowspan="2" class="sub-header">CPL</th>';
+    html += '<th rowspan="2" class="sub-header">РЛ</th>';
+    html += '<th rowspan="2" class="sub-header">SR%</th>';
+    html += `<th colspan="${daysInMonth}" class="group-header">ПЛАН (по дням)</th>`;
+    html += '<th colspan="6" class="total-header">НАРАСТАЮЩИМ ИТОГОМ</th>';
+    html += '<th colspan="3" class="fact-header">ФАКТ</th>';
+    html += '</tr><tr>';
+    for (let day = 1; day <= daysInMonth; day++) html += `<th class="day-header">${day}</th>`;
+    html += '<th class="total-header">Бюджет</th>';
+    html += '<th class="total-header">CPL</th>';
+    html += '<th class="total-header">РЛ</th>';
+    html += '<th class="total-header">SR%</th>';
+    html += '<th class="total-header">Контр.</th>';
+    html += '<th class="total-header">Выдачи</th>';
+    html += '<th class="fact-header">Контр.</th>';
+    html += '<th class="fact-header">Выдачи</th>';
+    html += '<th class="fact-header">SR%</th>';
+    html += '</tr>';
+    thead.innerHTML = html;
+}
+
+function renderPlanFactBody(daysInMonth, monthKey) {
+    const tbody = document.getElementById('planfact-tbody');
+    let html = '';
+    let currentGroup = '';
+    let groupTotals = { budget: 0, rl: 0, days: {} };
+    for (let day = 1; day <= daysInMonth; day++) groupTotals.days[day] = 0;
+    
+    channelsData.forEach((channel, idx) => {
+        if (channel.group !== currentGroup) {
+            if (currentGroup) {
+                html += renderPlanFactGroupTotalRow(currentGroup, groupTotals, daysInMonth);
+                groupTotals = { budget: 0, rl: 0, days: {} };
+                for (let day = 1; day <= daysInMonth; day++) groupTotals.days[day] = 0;
+            }
+            currentGroup = channel.group;
+            html += `<tr class="group-header-row"><td colspan="${4 + daysInMonth + 6 + 3}">${channel.group}</td></tr>`;
+        }
+        const channelPlan = planData[monthKey][channel.name];
+        html += `<tr>`;
+        html += `<td class="channel-name" title="${channel.name}">${channel.name}</td>`;
+        html += `<td contenteditable="true" data-channel="${channel.name}" data-field="budget" onblur="updateChannelParam(this)">${channelPlan.budget.toFixed(2)}</td>`;
+        html += `<td contenteditable="true" data-channel="${channel.name}" data-field="cpl" onblur="updateChannelParam(this)">${channelPlan.cpl.toFixed(2)}</td>`;
+        html += `<td contenteditable="true" data-channel="${channel.name}" data-field="rl" onblur="updateChannelParam(this)">${channelPlan.rl}</td>`;
+        html += `<td contenteditable="true" data-channel="${channel.name}" data-field="sr" onblur="updateChannelParam(this)">${channelPlan.sr.toFixed(1)}</td>`;
+        let totalLeads = 0;
+        for (let day = 1; day <= daysInMonth; day++) {
+            const value = channelPlan.days[day] || 0;
+            totalLeads += value;
+            groupTotals.days[day] += value;
+            html += `<td contenteditable="true" data-channel="${channel.name}" data-day="${day}" onblur="updateChannelDay(this)">${value}</td>`;
+        }
+        groupTotals.budget += channelPlan.budget;
+        groupTotals.rl += channelPlan.rl;
+        html += `<td class="calculated">${channelPlan.budget.toFixed(2)}</td>`;
+        html += `<td class="calculated">${channelPlan.cpl.toFixed(2)}</td>`;
+        html += `<td class="calculated">${channelPlan.rl}</td>`;
+        html += `<td class="calculated">${channelPlan.sr.toFixed(1)}</td>`;
+        html += `<td class="calculated">${Math.round(channelPlan.rl * channelPlan.sr / 100)}</td>`;
+        html += `<td class="calculated">${Math.round(totalLeads * channelPlan.sr / 100)}</td>`;
+        const fact = factData[monthKey];
+        html += `<td class="fact-cell" contenteditable="true" data-field="contracts" onblur="updateFact(this)">${fact.contracts || 0}</td>`;
+        html += `<td class="fact-cell" contenteditable="true" data-field="issued" onblur="updateFact(this)">${fact.issued || 0}</td>`;
+        const factSR = fact.contracts > 0 ? ((fact.issued / fact.contracts) * 100).toFixed(1) : '0.0';
+        html += `<td class="fact-cell calculated">${factSR}</td>`;
+        html += `</tr>`;
+    });
+    if (currentGroup) html += renderPlanFactGroupTotalRow(currentGroup, groupTotals, daysInMonth);
+    html += renderPlanFactGrandTotalRow(daysInMonth, monthKey);
+    tbody.innerHTML = html;
+}
+
+function renderPlanFactGroupTotalRow(groupName, totals, daysInMonth) {
+    let html = `<tr>`;
+    html += `<td class="group-total">Итого ${groupName}</td>`;
+    html += `<td class="group-total">${totals.budget.toFixed(2)}</td>`;
+    html += `<td class="group-total">-</td>`;
+    html += `<td class="group-total">${totals.rl}</td>`;
+    html += `<td class="group-total">-</td>`;
+    let totalLeads = 0;
+    for (let day = 1; day <= daysInMonth; day++) {
+        totalLeads += totals.days[day];
+        html += `<td class="group-total">${totals.days[day]}</td>`;
+    }
+    html += `<td class="group-total">${totals.budget.toFixed(2)}</td>`;
+    html += `<td class="group-total">-</td>`;
+    html += `<td class="group-total">${totals.rl}</td>`;
+    html += `<td class="group-total">-</td>`;
+    html += `<td class="group-total">-</td>`;
+    html += `<td class="group-total">${totalLeads}</td>`;
+    html += `<td class="group-total">-</td>`;
+    html += `<td class="group-total">-</td>`;
+    html += `<td class="group-total">-</td>`;
+    html += `</tr>`;
+    return html;
+}
+
+function renderPlanFactGrandTotalRow(daysInMonth, monthKey) {
+    let html = `<tr>`;
+    html += `<td class="grand-total">ИТОГО</td>`;
+    let totalBudget = 0, totalRL = 0, totalLeads = 0;
+    channelsData.forEach(ch => {
+        const plan = planData[monthKey][ch.name];
+        totalBudget += plan.budget;
+        totalRL += plan.rl;
+        for (let day = 1; day <= daysInMonth; day++) totalLeads += plan.days[day] || 0;
+    });
+    html += `<td class="grand-total">${totalBudget.toFixed(2)}</td>`;
+    html += `<td class="grand-total">-</td>`;
+    html += `<td class="grand-total">${totalRL}</td>`;
+    html += `<td class="grand-total">-</td>`;
+    for (let day = 1; day <= daysInMonth; day++) {
+        let dayTotal = 0;
+        channelsData.forEach(ch => { dayTotal += planData[monthKey][ch.name].days[day] || 0; });
+        html += `<td class="grand-total">${dayTotal}</td>`;
+    }
+    html += `<td class="grand-total">${totalBudget.toFixed(2)}</td>`;
+    html += `<td class="grand-total">-</td>`;
+    html += `<td class="grand-total">${totalRL}</td>`;
+    html += `<td class="grand-total">-</td>`;
+    html += `<td class="grand-total">-</td>`;
+    html += `<td class="grand-total">${totalLeads}</td>`;
+    const fact = factData[monthKey];
+    html += `<td class="grand-total">${fact.contracts || 0}</td>`;
+    html += `<td class="grand-total">${fact.issued || 0}</td>`;
+    const factSR = fact.contracts > 0 ? ((fact.issued / fact.contracts) * 100).toFixed(1) : '0.0';
+    html += `<td class="grand-total">${factSR}</td>`;
+    html += `</tr>`;
+    return html;
+}
+
+function updateChannelParam(td) {
+    const channelName = td.dataset.channel;
+    const field = td.dataset.field;
+    const value = parseFloat(td.textContent) || 0;
+    const monthKey = `${currentPlanFactYear}-${String(currentPlanFactMonth + 1).padStart(2, '0')}`;
+    planData[monthKey][channelName][field] = value;
+    savePlanData();
+    renderPlanFactTable();
+}
+
+function updateChannelDay(td) {
+    const channelName = td.dataset.channel;
+    const day = parseInt(td.dataset.day);
+    const value = parseInt(td.textContent) || 0;
+    const monthKey = `${currentPlanFactYear}-${String(currentPlanFactMonth + 1).padStart(2, '0')}`;
+    planData[monthKey][channelName].days[day] = value;
+    savePlanData();
+    renderPlanFactTable();
+}
+
+function updateFact(td) {
+    const field = td.dataset.field;
+    const value = parseInt(td.textContent) || 0;
+    const monthKey = `${currentPlanFactYear}-${String(currentPlanFactMonth + 1).padStart(2, '0')}`;
+    factData[monthKey][field] = value;
+    saveFactData();
+    renderPlanFactTable();
+}
+
+function recalculateAll() { renderPlanFactTable(); showToast('🔄 Пересчёт выполнен'); }
+
+function openChannelsSettings() {
+    document.getElementById('channelsModal').classList.add('active');
+    renderChannelsList();
+    renderGroupSelector();
+}
+
+function closeChannelsSettings() { document.getElementById('channelsModal').classList.remove('active'); }
+
+function renderChannelsList() {
+    const list = document.getElementById('channelsList');
+    let html = '<div class="channels-list">';
+    let currentGroup = '';
+    channelsData.forEach((channel, idx) => {
+        if (channel.group !== currentGroup) {
+            currentGroup = channel.group;
+            html += `<div style="background:#1e3c72; color:white; padding:6px 12px; font-weight:600; font-size:11px;">${currentGroup}</div>`;
+        }
+        html += `<div class="channel-item"><span class="channel-name">${channel.name}</span><span class="channel-group">${channel.group}</span><button onclick="editChannel(${idx})">✏️</button><button class="danger" onclick="deleteChannel(${idx})">🗑️</button></div>`;
+    });
+    html += '</div>';
+    list.innerHTML = html;
+}
+
+function renderGroupSelector() {
+    const select = document.getElementById('newChannelGroup');
+    select.innerHTML = DEFAULT_GROUPS.map(g => `<option value="${g}">${g}</option>`).join('');
+}
+
+function addChannel() {
+    const name = document.getElementById('newChannelName').value.trim();
+    const group = document.getElementById('newChannelGroup').value;
+    const budget = parseFloat(document.getElementById('newChannelBudget').value) || 0;
+    const cpl = parseFloat(document.getElementById('newChannelCPL').value) || 0;
+    const rl = parseInt(document.getElementById('newChannelRL').value) || 0;
+    const sr = parseFloat(document.getElementById('newChannelSR').value) || 0;
+    if (!name) { showToast('Введите название', 'error'); return; }
+    channelsData.push({ name, group, budget, cpl, rl, sr });
+    saveChannelsData();
+    document.getElementById('newChannelName').value = '';
+    document.getElementById('newChannelBudget').value = '0';
+    document.getElementById('newChannelCPL').value = '0';
+    document.getElementById('newChannelRL').value = '0';
+    document.getElementById('newChannelSR').value = '0';
+    renderChannelsList();
+    renderPlanFactTable();
+    showToast('✅ Канал добавлен');
+}
+
+function editChannel(idx) {
+    const channel = channelsData[idx];
+    const newName = prompt('Название:', channel.name);
+    if (newName && newName.trim()) {
+        channel.name = newName.trim();
+        saveChannelsData();
+        renderChannelsList();
+        renderPlanFactTable();
+        showToast('✅ Канал обновлён');
+    }
+}
+
+function deleteChannel(idx) {
+    const channel = channelsData[idx];
+    if (!confirm(`Удалить "${channel.name}"?`)) return;
+    channelsData.splice(idx, 1);
+    saveChannelsData();
+    renderChannelsList();
+    renderPlanFactTable();
+    showToast('🗑️ Канал удалён');
+}
+
+function exportPlanFactToExcel() {
+    const monthKey = `${currentPlanFactYear}-${String(currentPlanFactMonth + 1).padStart(2, '0')}`;
+    const daysInMonth = getDaysInMonth(currentPlanFactMonth, currentPlanFactYear);
+    const excelData = [];
+    const headers = ['Канал', 'Группа', 'Бюджет', 'CPL', 'РЛ', 'SR%'];
+    for (let day = 1; day <= daysInMonth; day++) headers.push(`День ${day}`);
+    headers.push('Итого лидов', 'Контракты (план)', 'Выдачи (план)', 'Контракты (факт)', 'Выдачи (факт)');
+    excelData.push(headers);
+    channelsData.forEach(channel => {
+        const plan = planData[monthKey][channel.name];
+        const row = [channel.name, channel.group, plan.budget, plan.cpl, plan.rl, plan.sr];
+        let totalLeads = 0;
+        for (let day = 1; day <= daysInMonth; day++) {
+            const value = plan.days[day] || 0;
+            row.push(value);
+            totalLeads += value;
+        }
+        row.push(totalLeads);
+        row.push(Math.round(plan.rl * plan.sr / 100));
+        row.push(Math.round(totalLeads * plan.sr / 100));
+        const fact = factData[monthKey];
+        row.push(fact.contracts || 0);
+        row.push(fact.issued || 0);
+        excelData.push(row);
+    });
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(excelData);
+    XLSX.utils.book_append_sheet(wb, ws, `${MONTHS[currentPlanFactMonth]} ${currentPlanFactYear}`);
+    XLSX.writeFile(wb, `plan_fact_${monthKey}.xlsx`);
+    showToast('📊 Excel экспортирован');
+}
+
+function importPlanFactFromExcel(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    showToast('📤 Импорт в разработке', 'warning');
+    event.target.value = '';
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === '?' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+        document.getElementById('shortcutsHint').classList.toggle('active');
+        return;
+    }
+    if (e.ctrlKey && e.key === 'a' && currentTab === 'sklad') {
+        if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+        e.preventDefault();
+        const checkbox = document.querySelector('#thead-sklad .checkbox-cell input');
+        if (checkbox) { checkbox.checked = !checkbox.checked; toggleAllRows('sklad', checkbox); }
+        return;
+    }
+    if (e.ctrlKey && e.key === 's') { e.preventDefault(); saveFullBackup(); return; }
+    if (e.ctrlKey && e.key === 'f') { e.preventDefault(); document.getElementById('globalSearchInput').focus(); return; }
+    if (e.ctrlKey && e.key === 'p') { e.preventDefault(); printReport(); return; }
+    if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+    const activeEl = document.activeElement;
+    if (!activeEl) return;
+    const isTrafficCell = activeEl.matches('td[contenteditable="true"]') || activeEl.matches('td.plan-cell input') || activeEl.matches('td.day-cell');
+    if (!isTrafficCell) return;
+    e.preventDefault();
+    const currentCell = activeEl.closest('td');
+    if (!currentCell) return;
+    const currentRow = currentCell.closest('tr');
+    if (!currentRow) return;
+    const table = currentCell.closest('table');
+    if (!table) return;
+    const allRows = Array.from(table.querySelectorAll('tr'));
+    const currentRowIndex = allRows.indexOf(currentRow);
+    const allCells = Array.from(currentRow.querySelectorAll('td'));
+    const currentCellIndex = allCells.indexOf(currentCell);
+    let targetRow = currentRowIndex;
+    let targetCell = currentCellIndex;
+    if (e.key === 'ArrowUp') targetRow = Math.max(0, currentRowIndex - 1);
+    else if (e.key === 'ArrowDown') targetRow = Math.min(allRows.length - 1, currentRowIndex + 1);
+    else if (e.key === 'ArrowLeft') targetCell = Math.max(0, currentCellIndex - 1);
+    else if (e.key === 'ArrowRight') targetCell = Math.min(allCells.length - 1, currentCellIndex + 1);
+    const targetRowEl = allRows[targetRow];
+    if (!targetRowEl) return;
+    const targetCells = Array.from(targetRowEl.querySelectorAll('td'));
+    const targetCellEl = targetCells[targetCell];
+    if (!targetCellEl) return;
+    const editableEl = targetCellEl.querySelector('[contenteditable="true"]') || targetCellEl.querySelector('input') || targetCellEl;
+    if (editableEl) {
+        editableEl.focus();
+        if (editableEl.tagName === 'INPUT') editableEl.select();
+    }
+});
+
+function renderTab(tabKey) {
+    const cfg = TABS_CONFIG[tabKey];
+    const state = tabsState[tabKey];
+    if (!cfg || !state) return;
+    renderFilters(tabKey);
+    applyColumnWidths(tabKey);
+    renderHeader(tabKey);
+    renderBody(tabKey);
+    updateStats(tabKey);
+}
+
+function renderFilters(tabKey) {
+    const state = tabsState[tabKey];
+    const filters = document.getElementById(`filters-${tabKey}`);
+    const selectCols = state.columns.filter(c => c.type === 'select');
+    let html = '';
+    selectCols.slice(0, 4).forEach(c => {
+        const values = [...new Set(state.data.map(r => r[c.key]).filter(Boolean))].sort();
+        html += `<label>${c.label}: <select id="filter-${tabKey}-${c.key}" onchange="renderBody('${tabKey}'); updateStats('${tabKey}')"><option value="">Все</option>${values.map(v => `<option>${v}</option>`).join('')}</select></label>`;
+    });
+    filters.innerHTML = html;
+}
+
+function applyColumnWidths(tabKey) {
+    const colgroup = document.getElementById(`colgroup-${tabKey}`);
+    const state = tabsState[tabKey];
+    let html = `<col style="width: 30px"><col style="width: 30px">`;
+    state.columns.forEach(c => html += `<col style="width: ${c.width}px">`);
+    colgroup.innerHTML = html;
+}
+
+function renderHeader(tabKey) {
+    const thead = document.getElementById(`thead-${tabKey}`);
+    const state = tabsState[tabKey];
+    let html = '<th class="row-num">№</th><th class="checkbox-cell"><input type="checkbox" onchange="toggleAllRows(\'' + tabKey + '\', this)"></th>';
+    state.columns.forEach((c, i) => {
+        html += `<th data-key="${c.key}" title="${c.label}"><span class="th-label" ondblclick="startRenameColumn(event, '${tabKey}', '${c.key}')" oncontextmenu="showHeaderContextMenu(event, '${tabKey}', '${c.key}')">${c.label}</span><div class="col-resizer" data-col-index="${i}" onmousedown="startResize(event, '${tabKey}', ${i})"></div></th>`;
+    });
+    thead.innerHTML = html;
+}
+
+function getFilteredData(tabKey) {
+    const state = tabsState[tabKey];
+    const selectCols = state.columns.filter(c => c.type === 'select').slice(0, 4);
+    return state.data.filter(r => {
+        for (const c of selectCols) {
+            const selectEl = document.getElementById(`filter-${tabKey}-${c.key}`);
+            if (selectEl && selectEl.value && r[c.key] !== selectEl.value) return false;
+        }
+        return true;
+    });
+}
+
+function renderBody(tabKey) {
+    const tbody = document.getElementById(`tbody-${tabKey}`);
+    const cfg = TABS_CONFIG[tabKey];
+    const state = tabsState[tabKey];
+    const filtered = getFilteredData(tabKey);
+    let html = '';
+    filtered.forEach((r, i) => {
+        let rowClass = '';
+        if (cfg.statusField && r[cfg.statusField] && cfg.statusMap[r[cfg.statusField]] !== undefined) rowClass = cfg.statusMap[r[cfg.statusField]];
+        const isSelected = selectedRows.has(`${tabKey}_${r.id}`);
+        html += `<tr class="${rowClass}" data-id="${r.id}" onclick="selectRow('${tabKey}', ${r.id})" oncontextmenu="showRowContextMenu(event, '${tabKey}', ${r.id})">`;
+        html += `<td class="row-num">${i + 1}</td>`;
+        html += `<td class="checkbox-cell" onclick="event.stopPropagation()"><input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleRowSelection('${tabKey}', ${r.id}, this)"></td>`;
+        state.columns.forEach(c => html += renderCell(tabKey, r, c));
+        html += `</tr>`;
+    });
+    html += renderTotalRow(tabKey, filtered);
+    tbody.innerHTML = html;
+}
+
+function renderCell(tabKey, r, c) {
+    const val = r[c.key];
+    if (c.type === 'select') {
+        const options = (selectOptions[c.options] || []).map(o => `<option ${String(o) === String(val) ? 'selected' : ''}>${o}</option>`).join('');
+        let extraClass = '';
+        if (c.key === 'ti' && tabKey === 'sklad') {
+            const hasLink = !!evaluationLinks[r.id];
+            const tiClass = hasLink ? 'cell-ti has-link' : 'cell-ti';
+            return `<td class="${tiClass}" oncontextmenu="showTiContextMenu(event, ${r.id})"><select onchange="updateCell('${tabKey}', ${r.id}, '${c.key}', this.value)">${options}</select></td>`;
+        }
+        return `<td class="${extraClass}"><select onchange="updateCell('${tabKey}', ${r.id}, '${c.key}', this.value)">${options}</select></td>`;
+    }
+    if (c.type === 'number') {
+        const cls = val < 0 ? 'negative' : (val > 0 ? 'positive' : '');
+        const display = val ? new Intl.NumberFormat('ru-RU').format(val) : '0';
+        return `<td class="cell-number ${cls}" contenteditable="true" onblur="updateCellNum('${tabKey}', ${r.id}, '${c.key}', this.textContent)">${display}</td>`;
+    }
+    if (c.type === 'date') return `<td><input type="date" value="${val || ''}" onchange="updateCell('${tabKey}', ${r.id}, '${c.key}', this.value)"></td>`;
+    return `<td class="cell-text" contenteditable="true" onblur="updateCell('${tabKey}', ${r.id}, '${c.key}', this.textContent)">${val || ''}</td>`;
+}
+
+function renderTotalRow(tabKey, rows) {
+    const state = tabsState[tabKey];
+    let totals = {};
+    state.columns.forEach(c => { if (c.type === 'number') totals[c.key] = 0; });
+    rows.forEach(r => { state.columns.forEach(c => { if (c.type === 'number') totals[c.key] += r[c.key] || 0; }); });
+    let html = `<tr class="total-row"><td class="row-num">Σ</td><td></td>`;
+    state.columns.forEach(c => {
+        if (c.type === 'number') {
+            const cls = totals[c.key] < 0 ? 'negative' : 'positive';
+            html += `<td class="cell-number ${cls}">${new Intl.NumberFormat('ru-RU').format(totals[c.key])}</td>`;
+        } else html += `<td></td>`;
+    });
+    html += `</tr>`;
+    return html;
+}
+
+function updateCell(tabKey, id, key, value) {
+    const r = tabsState[tabKey].data.find(r => r.id === id);
+    if (!r) return;
+    const oldValue = r[key];
+    r[key] = value.trim ? value.trim() : value;
+    saveTabDataKey(tabKey);
+    renderBody(tabKey);
+    updateStats(tabKey);
+    if (oldValue !== r[key]) addHistoryEntry('edit', `${TABS_CONFIG[tabKey].name}: ${r.model || ''} - ${key} изменено`);
+}
+
+function updateCellNum(tabKey, id, key, text) {
+    const r = tabsState[tabKey].data.find(r => r.id === id);
+    if (!r) return;
+    const oldValue = r[key];
+    r[key] = parseFloat(text.replace(/\s/g, '').replace(',', '.')) || 0;
+    saveTabDataKey(tabKey);
+    renderBody(tabKey);
+    updateStats(tabKey);
+    if (oldValue !== r[key]) addHistoryEntry('edit', `${TABS_CONFIG[tabKey].name}: ${r.model || ''} - ${key} = ${r[key]}`);
+}
+
+function addRow(tabKey) {
+    const state = tabsState[tabKey];
+    const newRow = { id: Date.now() };
+    state.columns.forEach(c => newRow[c.key] = c.default);
+    state.data.push(newRow);
+    saveTabDataKey(tabKey);
+    renderBody(tabKey);
+    updateStats(tabKey);
+    showToast('✅ Добавлено');
+    addHistoryEntry('add', `${TABS_CONFIG[tabKey].name}: добавлена строка`);
+}
+
+function duplicateRow(tabKey) {
+    if (!contextRowId && !selectedRowId) { showToast('Выберите строку', 'error'); return; }
+    const id = contextRowId || selectedRowId;
+    const state = tabsState[tabKey];
+    const r = state.data.find(r => r.id === id);
+    if (!r) return;
+    const newRow = { ...r, id: Date.now() };
+    const idx = state.data.findIndex(r => r.id === id);
+    state.data.splice(idx + 1, 0, newRow);
+    if (evaluationLinks[id]) { evaluationLinks[newRow.id] = evaluationLinks[id]; saveEvaluationLinks(); }
+    saveTabDataKey(tabKey);
+    renderBody(tabKey);
+    updateStats(tabKey);
+    showToast('📋 Дублировано');
+    addHistoryEntry('add', `${TABS_CONFIG[tabKey].name}: дублирована строка`);
+}
+
+function insertRowAbove(tabKey) {
+    if (!contextRowId) return;
+    const state = tabsState[tabKey];
+    const newRow = { id: Date.now() };
+    state.columns.forEach(c => newRow[c.key] = c.default);
+    const idx = state.data.findIndex(r => r.id === contextRowId);
+    state.data.splice(idx, 0, newRow);
+    saveTabDataKey(tabKey);
+    renderBody(tabKey);
+    updateStats(tabKey);
+}
+
+function insertRowBelow(tabKey) {
+    if (!contextRowId) return;
+    const state = tabsState[tabKey];
+    const newRow = { id: Date.now() };
+    state.columns.forEach(c => newRow[c.key] = c.default);
+    const idx = state.data.findIndex(r => r.id === contextRowId);
+    state.data.splice(idx + 1, 0, newRow);
+    saveTabDataKey(tabKey);
+    renderBody(tabKey);
+    updateStats(tabKey);
+}
+
+function deleteSelectedRow(tabKey) {
+    if (!contextRowId) return;
+    const state = tabsState[tabKey];
+    const r = state.data.find(r => r.id === contextRowId);
+    if (r && evaluationLinks[contextRowId]) {
+        linksArchive[contextRowId] = { url: evaluationLinks[contextRowId], model: r.model || '', client: r.client || '', deletedAt: new Date().toISOString() };
+        delete evaluationLinks[contextRowId];
+        saveEvaluationLinks();
+        saveLinksArchive();
+    }
+    state.data = state.data.filter(r => r.id !== contextRowId);
+    saveTabDataKey(tabKey);
+    renderBody(tabKey);
+    updateStats(tabKey);
+    showToast('🗑️ Удалено');
+    addHistoryEntry('delete', `${TABS_CONFIG[tabKey].name}: удалена строка ${r?.model || ''}`);
+}
+
+function selectRow(tabKey, id) {
+    selectedRowId = id;
+    document.querySelectorAll(`#tbody-${tabKey} tr`).forEach(tr => tr.style.outline = '');
+    const tr = document.querySelector(`#tbody-${tabKey} tr[data-id="${id}"]`);
+    if (tr) tr.style.outline = '2px solid #2a5298';
+}
+
+function updateStats(tabKey) {
+    const state = tabsState[tabKey];
+    const cfg = TABS_CONFIG[tabKey];
+    const statsEl = document.getElementById(`stats-${tabKey}`);
+    if (!statsEl) return;
+    const filtered = getFilteredData(tabKey);
+    const total = filtered.length;
+    let statusHtml = '';
+    if (cfg.statusField) {
+        const counts = {};
+        filtered.forEach(r => { const v = r[cfg.statusField]; if (v) counts[v] = (counts[v] || 0) + 1; });
+        statusHtml = Object.entries(counts).map(([k, v]) => `${k}: <b>${v}</b>`).join(' | ');
+    }
+    statsEl.innerHTML = `Всего: <b>${total}</b> ${statusHtml ? '| ' + statusHtml : ''}`;
+}
+
+let resizeState = null;
+const MIN_COL_WIDTH = 40;
+
+function startResize(e, tabKey, colIndex) {
+    e.preventDefault();
+    e.stopPropagation();
+    const resizer = e.target;
+    const state = tabsState[tabKey];
+    const c = state.columns[colIndex];
+    if (!c) return;
+    resizer.classList.add('active');
+    document.body.classList.add('resizing');
+    resizeState = { tabKey, colIndex, startX: e.clientX, startWidth: c.width, resizer };
+    document.addEventListener('mousemove', doResize);
+    document.addEventListener('mouseup', stopResize);
+}
+
+function doResize(e) {
+    if (!resizeState) return;
+    const diff = e.clientX - resizeState.startX;
+    const newWidth = Math.max(MIN_COL_WIDTH, resizeState.startWidth + diff);
+    tabsState[resizeState.tabKey].columns[resizeState.colIndex].width = newWidth;
+    const colgroup = document.getElementById(`colgroup-${resizeState.tabKey}`);
+    const cols = colgroup.querySelectorAll('col');
+    if (cols[resizeState.colIndex + 2]) cols[resizeState.colIndex + 2].style.width = newWidth + 'px';
+}
+
+function stopResize() {
+    if (!resizeState) return;
+    resizeState.resizer.classList.remove('active');
+    document.body.classList.remove('resizing');
+    document.removeEventListener('mousemove', doResize);
+    document.removeEventListener('mouseup', stopResize);
+    saveTabColumns(resizeState.tabKey);
+    resizeState = null;
+}
+
+function resetColumnWidths(tabKey) {
+    if (!confirm('Сбросить ширины?')) return;
+    const defaults = TABS_CONFIG[tabKey].defaultColumns;
+    tabsState[tabKey].columns.forEach((c, i) => c.width = defaults[i]?.width || 120);
+    saveTabColumns(tabKey);
+    renderTab(tabKey);
+    showToast('📏 Сброшено');
+}
+
+let currentContextTab = null;
+
+function showRowContextMenu(e, tabKey, id) {
+    e.preventDefault();
+    e.stopPropagation();
+    currentContextTab = tabKey;
+    contextRowId = id;
+    selectRow(tabKey, id);
+    const menu = document.getElementById('contextMenu');
+    menu.style.left = e.pageX + 'px';
+    menu.style.top = e.pageY + 'px';
+    menu.classList.add('active');
+}
+
+function showHeaderContextMenu(e, tabKey, key) {
+    e.preventDefault();
+    e.stopPropagation();
+    currentContextTab = tabKey;
+    contextColumnKey = key;
+    const menu = document.getElementById('headerContextMenu');
+    menu.style.left = e.pageX + 'px';
+    menu.style.top = e.pageY + 'px';
+    menu.classList.add('active');
+}
+
+function hideContextMenu() {
+    document.getElementById('contextMenu').classList.remove('active');
+    document.getElementById('headerContextMenu').classList.remove('active');
+    document.getElementById('tiContextMenu').classList.remove('active');
+    document.getElementById('commentContextMenu').classList.remove('active');
+}
+
+document.addEventListener('click', hideContextMenu);
+
+document.querySelectorAll('#contextMenu .context-menu-item').forEach(item => {
+    item.onclick = () => {
+        const action = item.dataset.action;
+        if (!currentContextTab) return;
+        if (action === 'duplicate') duplicateRow(currentContextTab);
+        if (action === 'insertAbove') insertRowAbove(currentContextTab);
+        if (action === 'insertBelow') insertRowBelow(currentContextTab);
+        if (action === 'delete') deleteSelectedRow(currentContextTab);
+        hideContextMenu();
+    };
+});
+
+document.querySelectorAll('#headerContextMenu .context-menu-item').forEach(item => {
+    item.onclick = () => {
+        const action = item.dataset.action;
+        if (!currentContextTab) return;
+        if (action === 'rename') renameColumn(currentContextTab);
+        if (action === 'changeType') changeColumnType(currentContextTab);
+        if (action === 'insertLeft') insertColumnLeft(currentContextTab);
+        if (action === 'insertRight') insertColumnRight(currentContextTab);
+        if (action === 'deleteCol') deleteColumn(currentContextTab);
+        hideContextMenu();
+    };
+});
+
+function startRenameColumn(e, tabKey, key) {
+    e.stopPropagation();
+    const th = e.target.closest('th');
+    const c = tabsState[tabKey].columns.find(c => c.key === key);
+    if (!c) return;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = c.label;
+    th.innerHTML = '';
+    th.appendChild(input);
+    input.focus();
+    input.select();
+    const finish = () => { c.label = input.value.trim() || c.label; saveTabColumns(tabKey); renderHeader(tabKey); };
+    input.onblur = finish;
+    input.onkeydown = (e) => { if (e.key === 'Enter') input.blur(); if (e.key === 'Escape') { input.value = c.label; input.blur(); } };
+}
+
+function renameColumn(tabKey) {
+    const c = tabsState[tabKey].columns.find(c => c.key === contextColumnKey);
+    if (!c) return;
+    const newName = prompt('Название:', c.label);
+    if (newName && newName.trim()) { c.label = newName.trim(); saveTabColumns(tabKey); renderTab(tabKey); showToast('✅ Переименован'); }
+}
+
+function changeColumnType(tabKey) {
+    const c = tabsState[tabKey].columns.find(c => c.key === contextColumnKey);
+    if (!c) return;
+    const types = ['text', 'number', 'date', 'url', 'select'];
+    const typeNames = ['Текст', 'Число', 'Дата', 'Ссылка', 'Список'];
+    let msg = 'Выберите тип:\n\n';
+    types.forEach((t, i) => msg += `${i + 1}. ${typeNames[i]}\n`);
+    const choice = prompt(msg, types.indexOf(c.type) + 1);
+    const idx = parseInt(choice) - 1;
+    if (idx >= 0 && idx < types.length) {
+        c.type = types[idx];
+        if (c.type === 'select') {
+            const listName = prompt('Имя списка:', 'custom_' + Date.now());
+            if (listName) { c.options = listName; if (!selectOptions[listName]) { selectOptions[listName] = []; saveSelectOptions(); } }
+        }
+        saveTabColumns(tabKey);
+        renderTab(tabKey);
+        showToast('✅ Тип изменён');
+    }
+}
+
+function insertColumnAt(tabKey, position) {
+    const name = prompt('Название:');
+    if (!name) return;
+    const type = prompt('Тип (text/number/date/url/select):', 'text') || 'text';
+    const key = 'col_' + Date.now();
+    const newCol = { key, label: name, type, default: type === 'number' ? 0 : '', width: 120 };
+    if (type === 'select') {
+        const listName = prompt('Имя списка:', 'custom_' + Date.now());
+        newCol.options = listName;
+        if (!selectOptions[listName]) { selectOptions[listName] = []; saveSelectOptions(); }
+    }
+    tabsState[tabKey].columns.splice(position, 0, newCol);
+    saveTabColumns(tabKey);
+    renderTab(tabKey);
+    showToast('✅ Добавлен');
+}
+
+function insertColumnLeft(tabKey) { const idx = tabsState[tabKey].columns.findIndex(c => c.key === contextColumnKey); if (idx !== -1) insertColumnAt(tabKey, idx); }
+function insertColumnRight(tabKey) { const idx = tabsState[tabKey].columns.findIndex(c => c.key === contextColumnKey); if (idx !== -1) insertColumnAt(tabKey, idx + 1); }
+
+function deleteColumn(tabKey) {
+    const c = tabsState[tabKey].columns.find(c => c.key === contextColumnKey);
+    if (!c) return;
+    if (!confirm(`Удалить "${c.label}"?`)) return;
+    tabsState[tabKey].columns = tabsState[tabKey].columns.filter(c => c.key !== contextColumnKey);
+    tabsState[tabKey].data.forEach(r => delete r[contextColumnKey]);
+    saveTabColumns(tabKey); saveTabDataKey(tabKey);
+    renderTab(tabKey);
+    showToast('🗑️ Удалён');
+}
+
+function openSettings(tabKey) {
+    settingsTabKey = tabKey;
+    document.getElementById('settingsModal').classList.add('active');
+    renderColumnsList();
+}
+
+function closeSettings() { document.getElementById('settingsModal').classList.remove('active'); settingsTabKey = null; }
+
+function showSettingsTab(tab) {
+    document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.modal-tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelector(`[onclick="showSettingsTab('${tab}')"]`).classList.add('active');
+    document.getElementById('settingsTab-' + tab).classList.add('active');
+    if (tab === 'columns') renderColumnsList();
+}
+
+function renderColumnsList() {
+    if (!settingsTabKey) return;
+    const list = document.getElementById('columnsList');
+    const state = tabsState[settingsTabKey];
+    const typeNames = { text: 'Текст', number: 'Число', date: 'Дата', url: 'Ссылка', select: 'Список' };
+    list.innerHTML = state.columns.map((c, i) => `<div style="display:flex; align-items:center; gap:6px; padding:6px 10px; border-bottom:1px solid #eee;"><span style="color:#7f8c8d; font-size:10px; min-width:22px;">${i + 1}</span><span style="flex:1; font-weight:500; font-size:12px;">${c.label}</span><span style="font-size:10px; color:#7f8c8d; background:#f0f2f5; padding:2px 5px; border-radius:3px;">${typeNames[c.type]}</span><span style="font-size:10px; color:#7f8c8d; background:#f0f2f5; padding:2px 5px; border-radius:3px;">${c.width}px</span><button onclick="editColumn('${c.key}')" style="padding:3px 7px; font-size:10px; border:1px solid #ddd; border-radius:3px; background:white; cursor:pointer;">✏️</button><button onclick="removeColumn('${c.key}')" style="padding:3px 7px; font-size:10px; border:1px solid #dc3545; border-radius:3px; background:white; cursor:pointer; color:#dc3545;">🗑️</button></div>`).join('');
+}
+
+function editColumn(key) {
+    const c = tabsState[settingsTabKey].columns.find(c => c.key === key);
+    if (!c) return;
+    const newName = prompt('Название:', c.label);
+    if (newName && newName.trim()) { c.label = newName.trim(); saveTabColumns(settingsTabKey); renderColumnsList(); renderTab(settingsTabKey); showToast('✅ Обновлено'); }
+}
+
+function removeColumn(key) {
+    const c = tabsState[settingsTabKey].columns.find(c => c.key === key);
+    if (!c) return;
+    if (!confirm(`Удалить "${c.label}"?`)) return;
+    tabsState[settingsTabKey].columns = tabsState[settingsTabKey].columns.filter(c => c.key !== key);
+    tabsState[settingsTabKey].data.forEach(r => delete r[key]);
+    saveTabColumns(settingsTabKey); saveTabDataKey(settingsTabKey);
+    renderColumnsList(); renderTab(settingsTabKey);
+    showToast('🗑️ Удалено');
+}
+
+function addColumn() {
+    if (!settingsTabKey) return;
+    const name = document.getElementById('newColumnName').value.trim();
+    const type = document.getElementById('newColumnType').value;
+    if (!name) { showToast('Введите название', 'error'); return; }
+    const key = 'col_' + Date.now();
+    const newCol = { key, label: name, type, default: type === 'number' ? 0 : '', width: 120 };
+    if (type === 'select') {
+        const optionsText = document.getElementById('newColumnOptions').value.trim();
+        const listName = 'custom_' + Date.now();
+        newCol.options = listName;
+        selectOptions[listName] = optionsText ? optionsText.split(',').map(s => s.trim()).filter(Boolean) : [];
+        saveSelectOptions();
+    }
+    tabsState[settingsTabKey].columns.push(newCol);
+    saveTabColumns(settingsTabKey);
+    renderColumnsList();
+    renderTab(settingsTabKey);
+    document.getElementById('newColumnName').value = '';
+    document.getElementById('newColumnOptions').value = '';
+    showToast('✅ Добавлен');
+}
+
+function exportCSV(tabKey) {
+    const state = tabsState[tabKey];
+    const headers = ['№', ...state.columns.map(c => c.label), 'Ссылка'];
+    let csv = headers.join(';') + '\n';
+    state.data.forEach((r, i) => {
+        const row = [i + 1, ...state.columns.map(c => r[c.key] || ''), evaluationLinks[r.id] || ''];
+        csv += row.map(v => `"${(v || '').toString().replace(/"/g, '""')}"`).join(';') + '\n';
+    });
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${tabKey}_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('📥 CSV скачан');
+}
+
+function importCSV(event, tabKey) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+        try {
+            const lines = e.target.result.split('\n').slice(1);
+            const imported = [];
+            lines.forEach((line, i) => {
+                if (!line.trim()) return;
+                const parts = line.match(/("([^"]*("")*)*"|[^;]+)/g) || [];
+                const clean = parts.map(p => p.replace(/^"|"$/g, '').replace(/""/g, '"'));
+                if (clean.length < 2) return;
+                const r = { id: Date.now() + i };
+                tabsState[tabKey].columns.forEach((c, idx) => {
+                    const v = clean[idx + 1] || '';
+                    r[c.key] = c.type === 'number' ? (parseFloat(v.replace(/\s/g, '').replace(',', '.')) || 0) : v;
+                });
+                imported.push(r);
+                const linkValue = clean[tabsState[tabKey].columns.length + 1];
+                if (linkValue && linkValue.trim()) evaluationLinks[r.id] = linkValue.trim();
+            });
+            if (imported.length > 0) {
+                tabsState[tabKey].data = imported;
+                saveTabDataKey(tabKey);
+                saveEvaluationLinks();
+                renderTab(tabKey);
+                showToast(`📤 Импортировано ${imported.length}`);
+                addHistoryEntry('bulk', `Импорт ${imported.length} строк из CSV`);
+            }
+        } catch (err) { showToast('❌ ' + err.message, 'error'); }
+    };
+    reader.readAsText(file, 'UTF-8');
+    event.target.value = '';
+}
+
+function setAnalyticsGroupBy(mode) {
+    analyticsGroupBy = mode;
+    saveAnalyticsGroupBy();
+    document.querySelectorAll('.group-switcher button').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    applyAnalyticsFilters();
+}
+
+function renderAnalytics() {
+    const content = document.getElementById('analyticsContent');
+    if (!content) return;
+    const data = tabsState.sklad?.data || [];
+    const models = [...new Set(data.map(r => r.model).filter(Boolean))].sort();
+    const traffics = [...new Set(data.map(r => r.traffic).filter(Boolean))].sort();
+    const risks = [...new Set(data.map(r => r.risk).filter(Boolean))].sort();
+    const krs = [...new Set(data.map(r => r.kr).filter(Boolean))].sort();
+    const tis = [...new Set(data.map(r => r.ti).filter(Boolean))].sort();
+    let html = `<h2>📊 Сводная аналитика</h2><div class="analytics-controls"><div class="group-switcher"><button class="${analyticsGroupBy === 'seller' ? 'active' : ''}" data-mode="seller" onclick="setAnalyticsGroupBy('seller')">👥 По продавцам</button><button class="${analyticsGroupBy === 'model' ? 'active' : ''}" data-mode="model" onclick="setAnalyticsGroupBy('model')">🚗 По моделям</button></div><label>Статус: <select id="filter-status" onchange="applyAnalyticsFilters()"><option value="all">Все</option><option value="Продан">Продан</option><option value="Склад">Склад</option><option value="Отказ">Отказ</option></select></label><label>Модель: <select id="filter-model" onchange="applyAnalyticsFilters()"><option value="all">Все</option>${models.map(m => `<option value="${m}">${m}</option>`).join('')}</select></label><label>Трафик: <select id="filter-traffic" onchange="applyAnalyticsFilters()"><option value="all">Все</option>${traffics.map(t => `<option value="${t}">${t}</option>`).join('')}</select></label><label>РИСК: <select id="filter-risk" onchange="applyAnalyticsFilters()"><option value="all">Все</option>${risks.map(r => `<option value="${r}">${r}</option>`).join('')}</select></label><label>КР: <select id="filter-kr" onchange="applyAnalyticsFilters()"><option value="all">Все</option>${krs.map(k => `<option value="${k}">${k}</option>`).join('')}</select></label><label>ТИ: <select id="filter-ti" onchange="applyAnalyticsFilters()"><option value="all">Все</option>${tis.map(t => `<option value="${t}">${t}</option>`).join('')}</select></label><button class="reset-btn" onclick="resetAnalyticsFilters()">🔄 Сброс</button></div><div id="analyticsTableContainer"></div>`;
+    content.innerHTML = html;
+    applyAnalyticsFilters();
+}
+
+function resetAnalyticsFilters() {
+    document.querySelectorAll('.analytics-controls select').forEach(s => s.value = 'all');
+    applyAnalyticsFilters();
+}
+
+function applyAnalyticsFilters() {
+    const data = tabsState.sklad?.data || [];
+    const statusFilter = document.getElementById('filter-status')?.value || 'all';
+    const modelFilter = document.getElementById('filter-model')?.value || 'all';
+    const trafficFilter = document.getElementById('filter-traffic')?.value || 'all';
+    const riskFilter = document.getElementById('filter-risk')?.value || 'all';
+    const krFilter = document.getElementById('filter-kr')?.value || 'all';
+    const tiFilter = document.getElementById('filter-ti')?.value || 'all';
+    const filtered = data.filter(r => {
+        if (statusFilter !== 'all' && r.status !== statusFilter) return false;
+        if (modelFilter !== 'all' && r.model !== modelFilter) return false;
+        if (trafficFilter !== 'all' && r.traffic !== trafficFilter) return false;
+        if (riskFilter !== 'all' && String(r.risk) !== String(riskFilter)) return false;
+        if (krFilter !== 'all' && String(r.kr) !== String(krFilter)) return false;
+        if (tiFilter !== 'all' && String(r.ti) !== String(tiFilter)) return false;
+        return true;
+    });
+    renderAnalyticsTable(filtered, statusFilter);
+}
+
+function renderAnalyticsTable(data, statusFilter) {
+    const container = document.getElementById('analyticsTableContainer');
+    if (!container) return;
+    const groupKey = analyticsGroupBy === 'model' ? 'model' : 'seller';
+    const groupLabel = analyticsGroupBy === 'model' ? 'Модель' : 'Продавец';
+    const groupStats = {};
+    data.forEach(r => {
+        const gv = r[groupKey] || 'Не указано';
+        if (!groupStats[gv]) groupStats[gv] = { count: 0, j: 0, o: 0, k: 0, jok: 0, ti: 0, kr: 0 };
+        groupStats[gv].count += 1;
+        groupStats[gv].j += r.j || 0;
+        groupStats[gv].o += r.o || 0;
+        groupStats[gv].k += r.k || 0;
+        groupStats[gv].jok += r.jok || 0;
+        groupStats[gv].ti += parseInt(r.ti) || 0;
+        groupStats[gv].kr += parseInt(r.kr) || 0;
+    });
+    const totals = { count: 0, j: 0, o: 0, k: 0, jok: 0, ti: 0, kr: 0 };
+    Object.values(groupStats).forEach(g => {
+        totals.count += g.count; totals.j += g.j; totals.o += g.o; totals.k += g.k; totals.jok += g.jok; totals.ti += g.ti; totals.kr += g.kr;
+    });
+    function fmtNum(n) { return new Intl.NumberFormat('ru-RU').format(Math.round(n)); }
+    function fmtPct(n, total) { return total > 0 ? (n / total * 100).toFixed(2).replace('.', ',') + '%' : '0,00%'; }
+    function numClass(n) { return n < 0 ? 'negative' : (n > 0 ? 'positive' : ''); }
+    const statusLabel = statusFilter === 'all' ? 'Все статусы' : statusFilter;
+    const modeLabel = analyticsGroupBy === 'model' ? '🚗 По моделям' : '👥 По продавцам';
+    let html = `<h3>📋 Группировка: <span class="info-badge">${modeLabel}</span> | Статус: <span class="info-badge">${statusLabel}</span></h3><table class="summary-table"><thead><tr><th rowspan="2" style="width:160px; min-width:160px; position:sticky; left:0; z-index:6; background:#1e3c72;">${groupLabel}</th><th rowspan="2" style="width:45px;">АМ</th><th colspan="4" class="group-header" style="background:#4a7bc7;">Удельные на 1 АМ</th><th colspan="2" class="group-header" style="background:#3a6ab7;">Количество</th><th colspan="4" class="group-header" style="background:#2a5298;">Суммы</th><th colspan="2" class="group-header" style="background:#1e3c72;">Проценты</th></tr><tr><th class="subgroup-ud">Ж уд.</th><th class="subgroup-ud">О уд.</th><th class="subgroup-ud">К уд.</th><th class="subgroup-ud">ЖОК уд.</th><th class="subgroup-sum">ТИ</th><th class="subgroup-sum">КР</th><th class="subgroup-sum">Ж</th><th class="subgroup-sum">О</th><th class="subgroup-sum">К</th><th class="subgroup-sum">ЖОК</th><th class="subgroup-percent">ТИ %</th><th class="subgroup-percent">КР %</th></tr></thead><tbody>`;
+    Object.keys(groupStats).sort().forEach(gv => {
+        const g = groupStats[gv];
+        const am = g.count;
+        html += `<tr><td class="group-name">${gv}</td><td class="cell-number">${am}</td>`;
+        html += `<td class="cell-number ${numClass(am > 0 ? g.j / am : 0)}">${fmtNum(am > 0 ? g.j / am : 0)}</td>`;
+        html += `<td class="cell-number ${numClass(am > 0 ? g.o / am : 0)}">${fmtNum(am > 0 ? g.o / am : 0)}</td>`;
+        html += `<td class="cell-number ${numClass(am > 0 ? g.k / am : 0)}">${fmtNum(am > 0 ? g.k / am : 0)}</td>`;
+        html += `<td class="cell-number ${numClass(am > 0 ? g.jok / am : 0)}">${fmtNum(am > 0 ? g.jok / am : 0)}</td>`;
+        html += `<td class="cell-number">${g.ti}</td><td class="cell-number">${g.kr}</td>`;
+        html += `<td class="cell-number ${numClass(g.j)}">${fmtNum(g.j)}</td><td class="cell-number ${numClass(g.o)}">${fmtNum(g.o)}</td>`;
+        html += `<td class="cell-number ${numClass(g.k)}">${fmtNum(g.k)}</td><td class="cell-number ${numClass(g.jok)}">${fmtNum(g.jok)}</td>`;
+        html += `<td class="cell-percent">${fmtPct(g.ti, am)}</td><td class="cell-percent">${fmtPct(g.kr, am)}</td></tr>`;
+    });
+    const totalAm = totals.count || 0;
+    html += `<tr class="total-row"><td class="group-name">Итого</td><td class="cell-number">${totalAm}</td>`;
+    html += `<td class="cell-number ${numClass(totalAm > 0 ? totals.j / totalAm : 0)}">${fmtNum(totalAm > 0 ? totals.j / totalAm : 0)}</td>`;
+    html += `<td class="cell-number ${numClass(totalAm > 0 ? totals.o / totalAm : 0)}">${fmtNum(totalAm > 0 ? totals.o / totalAm : 0)}</td>`;
+    html += `<td class="cell-number ${numClass(totalAm > 0 ? totals.k / totalAm : 0)}">${fmtNum(totalAm > 0 ? totals.k / totalAm : 0)}</td>`;
+    html += `<td class="cell-number ${numClass(totalAm > 0 ? totals.jok / totalAm : 0)}">${fmtNum(totalAm > 0 ? totals.jok / totalAm : 0)}</td>`;
+    html += `<td class="cell-number">${totals.ti}</td><td class="cell-number">${totals.kr}</td>`;
+    html += `<td class="cell-number ${numClass(totals.j)}">${fmtNum(totals.j)}</td><td class="cell-number ${numClass(totals.o)}">${fmtNum(totals.o)}</td>`;
+    html += `<td class="cell-number ${numClass(totals.k)}">${fmtNum(totals.k)}</td><td class="cell-number ${numClass(totals.jok)}">${fmtNum(totals.jok)}</td>`;
+    html += `<td class="cell-percent">${fmtPct(totals.ti, totalAm)}</td><td class="cell-percent">${fmtPct(totals.kr, totalAm)}</td></tr>`;
+    html += `</tbody></table><div class="kpi-grid" style="margin-top:12px;"><div class="kpi-card"><div class="label">Всего АМ</div><div class="value">${totalAm}</div></div><div class="kpi-card ${totals.jok >= 0 ? 'positive' : 'negative'}"><div class="label">Общий ЖОК</div><div class="value">${fmtNum(totals.jok)} ₽</div></div><div class="kpi-card neutral"><div class="label">ТИ</div><div class="value">${totals.ti}</div></div><div class="kpi-card neutral"><div class="label">КР</div><div class="value">${totals.kr}</div></div></div>`;
+    container.innerHTML = html;
+}
+
+function renderCalendar() {
+    const content = document.getElementById('calendarContent');
+    const year = calendarCurrentDate.getFullYear();
+    const month = calendarCurrentDate.getMonth();
+    const monthName = calendarCurrentDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+    const skladData = tabsState.sklad?.data || [];
+    const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+    const factByDate = {};
+    skladData.forEach(r => {
+        if (r.dateDkp && r.dateDkp.startsWith(prefix) && r.status === 'Продан') {
+            if (!factByDate[r.dateDkp]) factByDate[r.dateDkp] = { contracts: 0, issued: 0 };
+            factByDate[r.dateDkp].contracts++;
+        }
+        if (r.dateIssued && r.dateIssued.startsWith(prefix) && r.status === 'Продан') {
+            if (!factByDate[r.dateIssued]) factByDate[r.dateIssued] = { contracts: 0, issued: 0 };
+            factByDate[r.dateIssued].issued++;
+        }
+    });
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startDayOfWeek = (firstDay.getDay() + 6) % 7;
+    const daysInMonth = lastDay.getDate();
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    let html = `<div class="calendar-controls"><h3>📅 ${monthName.charAt(0).toUpperCase() + monthName.slice(1)}</h3><div class="calendar-nav-btns"><button onclick="changeCalendarMonth(-1)">◀ Пред.</button><button onclick="changeCalendarMonth(0)">Сегодня</button><button onclick="changeCalendarMonth(1)">След. ▶</button></div></div><div class="calendar-grid"><div class="calendar-day-header">Пн</div><div class="calendar-day-header">Вт</div><div class="calendar-day-header">Ср</div><div class="calendar-day-header">Чт</div><div class="calendar-day-header">Пт</div><div class="calendar-day-header">Сб</div><div class="calendar-day-header">Вс</div>`;
+    for (let i = 0; i < startDayOfWeek; i++) html += '<div class="calendar-day other-month"></div>';
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${prefix}-${String(day).padStart(2, '0')}`;
+        const isToday = dateStr === todayStr;
+        const tp = todayPlans[prefix]?.[String(day).padStart(2, '0')] || { meetings: 0, contracts: 0 };
+        const fact = factByDate[dateStr] || { contracts: 0, issued: 0 };
+        html += `<div class="calendar-day ${isToday ? 'today' : ''}" onclick="openCalendarDay('${dateStr}')"><div class="day-number">${day}</div><div class="day-stats"><div class="calendar-stat plan-meetings"><span class="stat-label">📅 Встречи:</span><span class="stat-value">${tp.meetings || 0}</span></div><div class="calendar-stat plan-contracts"><span class="stat-label">📋 План:</span><span class="stat-value">${tp.contracts || 0}</span></div><div class="calendar-stat fact-contracts"><span class="stat-label">✅ Факт:</span><span class="stat-value">${fact.contracts}</span></div><div class="calendar-stat fact-issued"><span class="stat-label">🚗 Выдачи:</span><span class="stat-value">${fact.issued}</span></div></div></div>`;
+    }
+    html += '</div>';
+    content.innerHTML = html;
+}
+
+function changeCalendarMonth(delta) {
+    if (delta === 0) calendarCurrentDate = new Date();
+    else calendarCurrentDate.setMonth(calendarCurrentDate.getMonth() + delta);
+    renderCalendar();
+}
+
+function openCalendarDay(dateStr) {
+    const [year, month, day] = dateStr.split('-');
+    const monthKey = `${year}-${month}`;
+    const tp = todayPlans[monthKey]?.[day] || { meetings: 0, contracts: 0 };
+    const fact = getFactForDate(dateStr);
+    document.getElementById('calendarDayTitle').textContent = `📅 ${new Date(dateStr).toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}`;
+    document.getElementById('calendarDayContent').innerHTML = `<div class="day-detail"><label>📞 Встречи:</label><input type="number" value="${tp.meetings || 0}" onchange="updateTodayPlanDate('${monthKey}', '${day}', 'meetings', this.value)"></div><div class="day-detail"><label>📋 План контрактов:</label><input type="number" value="${tp.contracts || 0}" onchange="updateTodayPlanDate('${monthKey}', '${day}', 'contracts', this.value)"></div><div style="margin-top:15px; padding:10px; background:#f8f9fa; border-radius:6px;"><div style="font-size:12px; font-weight:600; margin-bottom:8px;">📊 Факт за ${dateStr}:</div><div style="font-size:11px; margin-bottom:4px;">✅ Контрактов: <b>${fact.contracts}</b></div><div style="font-size:11px;">🚗 Выдач: <b>${fact.issued}</b></div></div>`;
+    document.getElementById('calendarDayModal').classList.add('active');
+}
+
+function closeCalendarDayModal() { document.getElementById('calendarDayModal').classList.remove('active'); renderCalendar(); }
+
+function updateTodayPlanDate(monthKey, day, key, value) {
+    if (!todayPlans[monthKey]) todayPlans[monthKey] = {};
+    if (!todayPlans[monthKey][day]) todayPlans[monthKey][day] = { meetings: 0, contracts: 0 };
+    todayPlans[monthKey][day][key] = parseInt(value) || 0;
+    saveTodayPlans();
+}
+
+function getFactForDate(dateStr) {
+    const skladData = tabsState.sklad?.data || [];
+    let contracts = 0, issued = 0;
+    skladData.forEach(r => {
+        if (r.status === 'Продан') {
+            if (r.dateDkp === dateStr) contracts++;
+            if (r.dateIssued === dateStr) issued++;
+        }
+    });
+    return { contracts, issued };
+}
+
+function showToast(msg, type = 'success') {
+    const t = document.createElement('div');
+    t.className = 'toast' + (type === 'error' ? ' error' : type === 'warning' ? ' warning' : '');
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3000);
+}
+
+function updateCurrentDate() {
+    const now = new Date();
+    document.getElementById('currentDate').textContent = now.toLocaleDateString('ru-RU', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+updateCurrentDate();
+updateBackupStatus();
+renderTab('sklad');
+
+setInterval(() => {
+    const lastBackup = localStorage.getItem('crm_last_backup_time');
+    if (!lastBackup || (Date.now() - new Date(lastBackup).getTime()) > 4 * 60 * 60 * 1000) {
+        showToast('⚠️ Рекомендуем сделать бэкап!', 'warning');
+    }
+}, 60 * 60 * 1000);
+</script>
+</body>
+</html>

@@ -1,0 +1,702 @@
+     1→     1→<!DOCTYPE html>
+     2→     2→<html lang="ru">
+     3→     3→<head>
+     4→     4→<meta charset="UTF-8">
+     5→     5→<meta name="viewport" content="width=device-width, initial-scale=1.0">
+     6→     6→<title>CRM Отдел продаж</title>
+     7→     7→<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+     8→     8→<style>
+     9→     9→    * { box-sizing: border-box; margin: 0; padding: 0; }
+    10→    10→    body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f0f2f5; color: #2c3e50; height: 100vh; display: flex; flex-direction: column; overflow: hidden; font-size: 12px; }
+    11→    11→    
+    12→    12→    .app-header { background: linear-gradient(135deg, #1e3c72, #2a5298); color: white; padding: 8px 20px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; flex-wrap: wrap; gap: 10px; }
+    13→    13→    .app-header h1 { font-size: 16px; font-weight: 600; }
+    14→    14→    .app-header p { font-size: 11px; opacity: 0.85; margin-top: 1px; }
+    15→    15→    .app-header .right-section { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    16→    16→    
+    17→    17→    .global-search { display: flex; align-items: center; background: rgba(255,255,255,0.15); border-radius: 6px; padding: 4px 10px; min-width: 220px; position: relative; }
+    18→    18→    .global-search input { background: transparent; border: none; color: white; outline: none; font-size: 12px; width: 100%; }
+    19→    19→    .global-search input::placeholder { color: rgba(255,255,255,0.7); }
+    20→    20→    .global-search-results { position: absolute; top: 100%; left: 0; right: 0; background: white; color: #2c3e50; border-radius: 0 0 6px 6px; max-height: 300px; overflow-y: auto; z-index: 2000; box-shadow: 0 4px 12px rgba(0,0,0,0.2); display: none; }
+    21→    21→    .global-search-results.active { display: block; }
+    22→    22→    .search-result-item { padding: 8px 12px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 11px; }
+    23→    23→    .search-result-item:hover { background: #f0f2f5; }
+    24→    24→    .search-result-item .highlight { background: #fff3cd; padding: 0 2px; border-radius: 2px; }
+    25→    25→    
+    26→    26→    .backup-status { display: flex; align-items: center; gap: 6px; font-size: 10px; background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 4px; }
+    27→    27→    .backup-status.warning { background: rgba(255,193,7,0.3); }
+    28→    28→    .backup-status.danger { background: rgba(220,53,69,0.3); }
+    29→    29→    
+    30→    30→    .tabs-bar { background: white; padding: 0 15px; display: flex; gap: 3px; border-bottom: 2px solid #e0e0e0; flex-shrink: 0; overflow-x: auto; }
+    31→    31→    .tab-btn { padding: 8px 14px; background: transparent; border: none; cursor: pointer; font-size: 12px; font-weight: 500; color: #7f8c8d; border-bottom: 3px solid transparent; margin-bottom: -2px; white-space: nowrap; }
+    32→    32→    .tab-btn:hover { color: #2a5298; background: #f8f9fa; }
+    33→    33→    .tab-btn.active { color: #2a5298; border-bottom-color: #2a5298; font-weight: 600; }
+    34→    34→    
+    35→    35→    .tab-content { flex: 1; display: none; flex-direction: column; overflow: hidden; min-height: 0; }
+    36→    36→    .tab-content.active { display: flex; }
+    37→    37→    
+    38→    38→    .toolbar { background: white; padding: 6px 15px; display: flex; gap: 6px; align-items: center; border-bottom: 1px solid #e0e0e0; flex-wrap: wrap; flex-shrink: 0; }
+    39→    39→    .toolbar button { padding: 5px 10px; border: 1px solid #ddd; border-radius: 4px; background: white; cursor: pointer; font-size: 11px; display: flex; align-items: center; gap: 3px; }
+    40→    40→    .toolbar button:hover { background: #f0f2f5; border-color: #2a5298; }
+    41→    41→    .toolbar button.primary { background: #2a5298; color: white; border-color: #2a5298; }
+    42→    42→    .toolbar button.success { background: #28a745; color: white; border-color: #28a745; }
+    43→    43→    .toolbar button.danger { background: #dc3545; color: white; border-color: #dc3545; }
+    44→    44→    .toolbar .separator { width: 1px; height: 18px; background: #ddd; margin: 0 3px; }
+    45→    45→    .toolbar label { font-size: 11px; display: flex; align-items: center; gap: 4px; }
+    46→    46→    .toolbar select, .toolbar input { padding: 3px 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px; }
+    47→    47→    .toolbar .stats { margin-left: auto; font-size: 11px; color: #7f8c8d; }
+    48→    48→    .toolbar .stats b { color: #2c3e50; }
+    49→    49→    
+    50→    50→    .bulk-actions { background: #e3f2fd; border: 1px solid #2196f3; padding: 6px 12px; display: none; align-items: center; gap: 10px; border-radius: 4px; }
+    51→    51→    .bulk-actions.active { display: flex; }
+    52→    52→    .bulk-actions .count { font-weight: 600; color: #1976d2; }
+    53→    53→    
+    54→    54→    .filters { background: #f8f9fa; padding: 5px 15px; display: flex; gap: 8px; align-items: center; border-bottom: 1px solid #e0e0e0; font-size: 11px; flex-wrap: wrap; flex-shrink: 0; }
+    55→    55→    .filters label { display: flex; align-items: center; gap: 3px; }
+    56→    56→    .filters select, .filters input { padding: 3px 6px; border: 1px solid #ddd; border-radius: 3px; font-size: 11px; }
+    57→    57→    
+    58→    58→    .table-wrapper { flex: 1; overflow: auto; background: white; position: relative; min-height: 0; }
+    59→    59→    table { border-collapse: collapse; font-size: 12px; }
+    60→    60→    thead { position: sticky; top: 0; z-index: 10; }
+    61→    61→    
+    62→    62→    th { background: #f1f3f4; border: 1px solid #dadce0; padding: 6px 4px; text-align: center; font-weight: 600; font-size: 10px; color: #3c4043; white-space: nowrap; user-select: none; cursor: pointer; position: relative; }
+    63→    63→    th:hover { background: #e8eaed; }
+    64→    64→    
+    65→    65→    .col-resizer { position: absolute; top: 0; right: 0; width: 4px; height: 100%; cursor: col-resize; user-select: none; background: transparent; z-index: 5; }
+    66→    66→    .col-resizer:hover, .col-resizer.active { background: #2a5298; }
+    67→    67→    
+    68→    68→    td { border: 1px solid #e0e0e0; padding: 3px 4px; vertical-align: middle; text-align: center; }
+    69→    69→    td.cell-number { text-align: center; font-variant-numeric: tabular-nums; }
+    70→    70→    td.cell-number.negative { color: #dc3545; }
+    71→    71→    td.cell-number.positive { color: #28a745; }
+    72→    72→    td.cell-text { text-align: left; white-space: normal; }
+    73→    73→    
+    74→    74→    td.cell-ti { cursor: default; }
+    75→    75→    td.cell-ti.has-link { background: #e8f0fe !important; color: #1a73e8; font-weight: 700; position: relative; }
+    76→    76→    td.cell-ti.has-link::after { content: '🔗'; position: absolute; top: 1px; right: 2px; font-size: 8px; opacity: 0.8; }
+    77→    77→    
+    78→    78→    td[contenteditable="true"]:focus { outline: 2px solid #2a5298; outline-offset: -2px; background: white !important; }
+    79→    79→    td[contenteditable="true"] { cursor: text; }
+    80→    80→    
+    81→    81→    td.search-highlight { background: #fff59d !important; }
+    82→    82→    td.has-comment { position: relative; }
+    83→    83→    td.has-comment::before { content: '💬'; position: absolute; top: 1px; left: 2px; font-size: 8px; opacity: 0.7; }
+    84→    84→    
+    85→    85→    td input[type="date"] { width: 100%; border: 1px solid transparent; background: transparent; font-size: 11px; padding: 2px; cursor: pointer; text-align: center; }
+    86→    86→    td input[type="date"]:hover { border-color: #ddd; background: white; }
+    87→    87→    
+    88→    88→    tr:hover td { background: #f8f9fa; }
+    89→    89→    tr.row-sold td { background: #e8f5e9; }
+    90→    90→    tr.row-sklad td { background: #fff8e1; }
+    91→    91→    tr.row-refusal td { background: #ffebee; }
+    92→    92→    
+    93→    93→    tr.total-row td { background: #e8f0fe !important; font-weight: bold; border-top: 2px solid #1a73e8; }
+    94→    94→    
+    95→    95→    td.row-num { background: #f1f3f4; text-align: center; color: #7f8c8d; font-size: 10px; width: 30px; cursor: default; }
+    96→    96→    td.checkbox-cell { width: 30px; padding: 0; }
+    97→    97→    td.checkbox-cell input { width: 16px; height: 16px; cursor: pointer; }
+    98→    98→    
+    99→    99→    .ti-hint { font-size: 10px; color: #7f8c8d; padding: 4px 15px; background: #f8f9fa; border-bottom: 1px solid #e0e0e0; flex-shrink: 0; }
+   100→   100→    
+   101→   101→    /* ТРАФИК */
+   102→   102→    .traffic-content { flex: 1; overflow: auto; padding: 10px; background: #f0f2f5; min-height: 0; }
+   103→   103→    .traffic-header-kpi { background: white; border-radius: 8px; padding: 10px 15px; margin-bottom: 10px; flex-shrink: 0; }
+   104→   104→    .traffic-header-kpi .kpi-title { font-size: 12px; font-weight: 600; margin-bottom: 8px; }
+   105→   105→    .traffic-header-kpi .kpi-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+   106→   106→    .kpi-block { background: #f8f9fa; border-radius: 6px; padding: 8px 12px; border-left: 3px solid #2a5298; }
+   107→   107→    .kpi-block.calls { border-left-color: #667eea; }
+   108→   108→    .kpi-block.visits { border-left-color: #11998e; }
+   109→   109→    .kpi-block .block-title { font-size: 11px; font-weight: 600; margin-bottom: 4px; }
+   110→   110→    .kpi-block .block-stats { display: flex; gap: 15px; flex-wrap: wrap; }
+   111→   111→    .kpi-block .stat-item { display: flex; flex-direction: column; }
+   112→   112→    .kpi-block .stat-label { font-size: 9px; text-transform: uppercase; color: #7f8c8d; font-weight: 600; }
+   113→   113→    .kpi-block .stat-value { font-size: 18px; font-weight: 700; margin-top: 1px; }
+   114→   114→    .kpi-block.calls .stat-value { color: #667eea; }
+   115→   115→    .kpi-block.visits .stat-value { color: #11998e; }
+   116→   116→    .kpi-block .stat-value.contracts { color: #e67e22; }
+   117→   117→    .kpi-block .stat-value.strike { color: #dc3545; }
+   118→   118→    .kpi-block .stat-value.percent { color: #28a745; }
+   119→   119→    
+   120→   120→    .traffic-section { background: white; border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+   121→   121→    .traffic-section-header { padding: 8px 14px; color: white; font-size: 13px; font-weight: 600; }
+   122→   122→    .traffic-section-header.calls { background: linear-gradient(135deg, #667eea, #764ba2); }
+   123→   123→    .traffic-section-header.visits { background: linear-gradient(135deg, #11998e, #38ef7d); }
+   124→   124→    .traffic-section-header.total { background: linear-gradient(135deg, #f093fb, #f5576c); }
+   125→   125→    
+   126→   126→    .traffic-table-wrapper { overflow-x: auto; }
+   127→   127→    .traffic-table { border-collapse: collapse; font-size: 11px; width: max-content; min-width: 100%; }
+   128→   128→    .traffic-table th { background: #2a5298; color: white; padding: 4px 2px; font-size: 10px; text-align: center; border: 1px solid #1e3c72; white-space: nowrap; }
+   129→   129→    .traffic-table th.model-header, .traffic-table td.model-cell { background: #1e3c72; position: sticky; left: 0; z-index: 15; min-width: 110px; text-align: left; padding: 4px 8px; font-weight: 600; color: white; }
+   130→   130→    .traffic-table td.model-cell { background: #34495e; color: #ecf0f1; }
+   131→   131→    .traffic-table th.day-header { min-width: 34px; width: 34px; }
+   132→   132→    .traffic-table th.day-header .day-num { font-size: 11px; font-weight: 700; display: block; }
+   133→   133→    .traffic-table th.day-header .day-name { font-size: 8px; opacity: 0.85; display: block; }
+   134→   134→    .traffic-table td.day-cell { min-width: 34px; width: 34px; }
+   135→   135→    .traffic-table td.day-cell[contenteditable="true"]:hover { background: #e8f0fe; cursor: text; }
+   136→   136→    .traffic-table th.summary-header { background: #28a745; min-width: 50px; }
+   137→   137→    .traffic-table th.contract-header { background: #e67e22; min-width: 60px; }
+   138→   138→    .traffic-table th.strike-header { background: #dc3545; min-width: 60px; }
+   139→   139→    .traffic-table td { padding: 3px 2px; border: 1px solid #e0e0e0; text-align: center; font-size: 11px; }
+   140→   140→    .traffic-table td.summary-cell { background: #e8f5e9; font-weight: 700; color: #1e7e34; min-width: 50px; }
+   141→   141→    .traffic-table td.contract-cell { background: #fff3cd; font-weight: 700; color: #856404; min-width: 60px; border-left: 2px solid #e67e22; }
+   142→   142→    .traffic-table td.strike-cell { background: #ffebee; font-weight: 700; color: #dc3545; min-width: 60px; border-left: 2px solid #dc3545; }
+   143→   143→    .traffic-table td.strike-cell.positive { color: #28a745; background: #e8f5e9; }
+   144→   144→    .traffic-table td.total-cell { background: #e8f0fe !important; font-weight: bold; color: #2a5298; }
+   145→   145→    .traffic-table td.total-cell.contract-total { background: #fff3cd !important; color: #856404; border-left: 2px solid #e67e22; }
+   146→   146→    .traffic-table td.plan-label { background: #f3e5f5; color: #6a1b9a; font-weight: 600; text-align: left; padding: 4px 8px; position: sticky; left: 0; z-index: 15; }
+   147→   147→    .traffic-table td.plan-cell { background: #fce4ec; min-width: 34px; padding: 2px 1px; }
+   148→   148→    .traffic-table td.plan-cell input { width: 100%; border: none; background: transparent; text-align: center; font-size: 11px; font-weight: 600; color: #6a1b9a; padding: 0; }
+   149→   149→    .traffic-table td.plan-total { background: #f3e5f5; font-weight: 700; color: #6a1b9a; min-width: 50px; }
+   150→   150→    .traffic-table td.contracts-label { background: #fff8e1; color: #f57f17; font-weight: 600; text-align: left; padding: 4px 8px; position: sticky; left: 0; z-index: 15; }
+   151→   151→    .traffic-table td.contracts-cell { background: #fff9c4; min-width: 34px; font-weight: 700; color: #f57f17; }
+   152→   152→    .traffic-table td.contracts-total { background: #fff8e1; font-weight: 700; color: #f57f17; min-width: 50px; }
+   153→   153→    .traffic-table td.bank-label { background: #fce4ec; color: #c2185b; font-weight: 700; text-align: left; padding: 4px 8px; position: sticky; left: 0; z-index: 15; }
+   154→   154→    .traffic-table td.bank-cell { background: #f8bbd0; min-width: 34px; font-weight: 700; color: #c2185b; }
+   155→   155→    .traffic-table td.bank-total { background: #fce4ec; font-weight: 700; color: #c2185b; min-width: 50px; }
+   156→   156→    .traffic-table tr.total-row td { background: #e8f0fe !important; font-weight: bold; border-top: 2px solid #2a5298; }
+   157→   157→    .traffic-table tr.total-row td.model-cell { background: #1e3c72 !important; color: white; }
+   158→   158→    
+   159→   159→    .traffic-weeks-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px; padding: 10px; background: #f8f9fa; border-top: 1px solid #e0e0e0; }
+   160→   160→    .week-block { background: white; border-radius: 6px; padding: 6px; text-align: center; border: 1px solid #e0e0e0; }
+   161→   161→    .week-block .week-title { font-size: 9px; font-weight: 600; color: #7f8c8d; margin-bottom: 3px; }
+   162→   162→    .week-block .week-traffic { font-size: 13px; font-weight: 700; color: #667eea; }
+   163→   163→    .week-block .week-contracts { font-size: 11px; color: #28a745; }
+   164→   164→    
+   165→   165→    .forecast-section { background: linear-gradient(135deg, #667eea, #764ba2); color: white; border-radius: 8px; padding: 15px; margin-bottom: 10px; }
+   166→   166→    .forecast-section h3 { margin-bottom: 10px; font-size: 14px; }
+   167→   167→    .forecast-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+   168→   168→    .forecast-item { background: rgba(255,255,255,0.15); border-radius: 6px; padding: 10px; text-align: center; }
+   169→   169→    .forecast-item .label { font-size: 10px; opacity: 0.9; margin-bottom: 4px; }
+   170→   170→    .forecast-item .value { font-size: 20px; font-weight: 700; }
+   171→   171→    .forecast-item .sub { font-size: 9px; opacity: 0.8; margin-top: 2px; }
+   172→   172→    
+   173→   173→    /* ПЛАН/ФАКТ - ИСПРАВЛЕНО */
+   174→   174→    .plan-fact-content { 
+   175→   175→        flex: 1; 
+   176→   176→        overflow: auto; 
+   177→   177→        padding: 10px; 
+   178→   178→        background: #f0f2f5; 
+   179→   179→        min-height: 0; 
+   180→   180→    }
+   181→   181→    .plan-fact-table-wrapper { 
+   182→   182→        overflow-x: auto; 
+   183→   183→        overflow-y: auto;
+   184→   184→        background: white; 
+   185→   185→        border-radius: 8px; 
+   186→   186→        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+   187→   187→        max-height: calc(100vh - 120px);
+   188→   188→    }
+   189→   189→    .plan-fact-table { 
+   190→   190→        border-collapse: collapse; 
+   191→   191→        font-size: 10px; 
+   192→   192→        width: max-content;
+   193→   193→        min-width: 100%;
+   194→   194→    }
+   195→   195→    .plan-fact-table th {
+   196→   196→        background: #2a5298;
+   197→   197→        color: white;
+   198→   198→        padding: 3px 3px;
+   199→   199→        font-size: 9px;
+   200→   200→        text-align: center;
+   201→   201→        border: 1px solid #1e3c72;
+   202→   202→        white-space: nowrap;
+   203→   203→        position: sticky;
+   204→   204→        top: 0;
+   205→   205→        z-index: 10;
+   206→   206→    }
+   207→   207→    .plan-fact-table th.group-header { background: #1e3c72; font-weight: 700; font-size: 10px; }
+   208→   208→    .plan-fact-table th.sub-header { background: #3a6ab7; font-size: 9px; }
+   209→   209→    .plan-fact-table th.day-header { 
+   210→   210→        background: #4a7bc7; 
+   211→   211→        min-width: 28px; 
+   212→   212→        width: 28px; 
+   213→   213→        font-size: 9px; 
+   214→   214→    }
+   215→   215→    .plan-fact-table th.total-header { background: #28a745; font-weight: 700; }
+   216→   216→    .plan-fact-table th.fact-header { background: #e67e22; font-weight: 700; }
+   217→   217→    .plan-fact-table td {
+   218→   218→        padding: 2px 3px;
+   219→   219→        border: 1px solid #e0e0e0;
+   220→   220→        text-align: center;
+   221→   221→        font-size: 10px;
+   222→   222→    }
+   223→   223→    .plan-fact-table td.channel-name {
+   224→   224→        text-align: left;
+   225→   225→        padding-left: 8px;
+   226→   226→        font-weight: 500;
+   227→   227→        background: #f8f9fa;
+   228→   228→        min-width: 160px;
+   229→   229→        max-width: 200px;
+   230→   230→        position: sticky;
+   231→   231→        left: 0;
+   232→   232→        z-index: 5;
+   233→   233→        white-space: nowrap;
+   234→   234→        overflow: hidden;
+   235→   235→        text-overflow: ellipsis;
+   236→   236→    }
+   237→   237→    .plan-fact-table td.group-total { background: #e8f5e9; font-weight: 700; color: #1e7e34; }
+   238→   238→    .plan-fact-table td.grand-total { background: #fff3cd; font-weight: 700; color: #856404; font-size: 11px; }
+   239→   239→    .plan-fact-table td[contenteditable="true"] { cursor: text; background: white; }
+   240→   240→    .plan-fact-table td[contenteditable="true"]:focus { outline: 2px solid #2a5298; outline-offset: -2px; background: #e3f2fd; }
+   241→   241→    .plan-fact-table td[contenteditable="true"]:hover { background: #f0f2f5; }
+   242→   242→    .plan-fact-table td.calculated { background: #f5f5f5; color: #666; font-style: italic; }
+   243→   243→    .plan-fact-table td.fact-cell { background: #fff8e1; font-weight: 600; }
+   244→   244→    .plan-fact-table td.fact-cell[contenteditable="true"]:focus { background: #ffecb3; }
+   245→   245→    .plan-fact-table tr:hover td { background: #f8f9fa; }
+   246→   246→    .plan-fact-table tr:hover td.channel-name { background: #e8f0fe; }
+   247→   247→    .plan-fact-table tr:hover td.group-total { background: #c8e6c9; }
+   248→   248→    .plan-fact-table tr:hover td.grand-total { background: #ffe082; }
+   249→   249→    .plan-fact-table tr.group-header-row td { background: #1e3c72; color: white; font-weight: 700; text-align: left; padding-left: 8px; font-size: 11px; }
+   250→   250→    
+   251→   251→    /* АНАЛИТИКА */
+   252→   252→    .analytics-content { flex: 1; overflow-y: auto; padding: 12px; background: #f0f2f5; min-height: 0; }
+   253→   253→    .analytics-content h2 { margin-bottom: 10px; color: #2c3e50; font-size: 16px; }
+   254→   254→    .analytics-content h3 { margin: 15px 0 6px; color: #2c3e50; font-size: 13px; }
+   255→   255→    .analytics-controls { background: white; padding: 10px; border-radius: 6px; margin-bottom: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+   256→   256→    .analytics-controls label { font-weight: 500; font-size: 11px; display: flex; align-items: center; gap: 3px; }
+   257→   257→    .analytics-controls select { padding: 4px 7px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px; min-width: 110px; }
+   258→   258→    .analytics-controls .reset-btn { padding: 4px 9px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 10px; }
+   259→   259→    .group-switcher { display: flex; background: #f0f2f5; border-radius: 6px; padding: 2px; gap: 2px; border: 1px solid #e0e0e0; }
+   260→   260→    .group-switcher button { padding: 5px 12px; background: transparent; border: none; border-radius: 5px; cursor: pointer; font-size: 11px; font-weight: 500; color: #7f8c8d; }
+   261→   261→    .group-switcher button:hover { color: #2a5298; background: white; }
+   262→   262→    .group-switcher button.active { background: #2a5298; color: white; }
+   263→   263→    
+   264→   264→    .summary-table { width: 100%; border-collapse: collapse; background: white; border-radius: 6px; overflow: hidden; margin-bottom: 12px; font-size: 10px; }
+   265→   265→    .summary-table th { background: #2a5298; color: white; padding: 6px 4px; font-size: 9px; text-align: center; border: 1px solid #1e3c72; font-weight: 600; }
+   266→   266→    .summary-table th.group-header { background: #1e3c72; font-size: 11px; padding: 5px; }
+   267→   267→    .summary-table td { padding: 5px 4px; border: 1px solid #e0e0e0; text-align: center; font-size: 10px; }
+   268→   268→    .summary-table td.group-name { font-weight: 600; text-align: left; background: #f8f9fa; white-space: nowrap; position: sticky; left: 0; z-index: 5; }
+   269→   269→    .summary-table td.cell-number { text-align: right; font-variant-numeric: tabular-nums; }
+   270→   270→    .summary-table td.cell-number.negative { color: #dc3545; }
+   271→   271→    .summary-table td.cell-number.positive { color: #28a745; }
+   272→   272→    .summary-table td.cell-percent { color: #2a5298; font-weight: 600; }
+   273→   273→    .summary-table tr.total-row td { background: #e8f0fe !important; font-weight: bold; border-top: 2px solid #2a5298; }
+   274→   274→    .summary-table tr.total-row td.group-name { background: #d0e0ff !important; position: sticky; left: 0; }
+   275→   275→    .summary-table tr:hover td { background: #f8f9fa; }
+   276→   276→    
+   277→   277→    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 12px; }
+   278→   278→    .kpi-card { background: white; padding: 12px; border-radius: 6px; border-left: 3px solid #2a5298; }
+   279→   279→    .kpi-card .label { font-size: 10px; text-transform: uppercase; color: #7f8c8d; font-weight: 600; }
+   280→   280→    .kpi-card .value { font-size: 20px; font-weight: bold; margin: 4px 0; }
+   281→   281→    .kpi-card .sub { font-size: 10px; color: #95a5a6; }
+   282→   282→    .kpi-card.positive { border-left-color: #28a745; }
+   283→   283→    .kpi-card.negative { border-left-color: #dc3545; }
+   284→   284→    .kpi-card.neutral { border-left-color: #ffc107; }
+   285→   285→    .info-badge { display: inline-block; background: #e8f0fe; color: #2a5298; padding: 2px 5px; border-radius: 3px; font-size: 9px; font-weight: 600; margin-left: 4px; }
+   286→   286→    
+   287→   287→    /* КАЛЕНДАРЬ */
+   288→   288→    .calendar-content { flex: 1; overflow: auto; padding: 15px; background: #f0f2f5; min-height: 0; }
+   289→   289→    .calendar-controls { display: flex; align-items: center; justify-content: space-between; background: white; padding: 12px 15px; border-radius: 8px; margin-bottom: 12px; }
+   290→   290→    .calendar-controls h3 { font-size: 16px; }
+   291→   291→    .calendar-nav-btns { display: flex; gap: 8px; }
+   292→   292→    .calendar-nav-btns button { padding: 6px 14px; background: #2a5298; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 11px; }
+   293→   293→    .calendar-nav-btns button:hover { background: #1e3c72; }
+   294→   294→    .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+   295→   295→    .calendar-day-header { text-align: center; font-weight: 600; font-size: 11px; color: #7f8c8d; padding: 8px; }
+   296→   296→    .calendar-day { background: white; border-radius: 8px; padding: 8px; min-height: 90px; border: 1px solid #e0e0e0; cursor: pointer; }
+   297→   297→    .calendar-day:hover { border-color: #2a5298; transform: translateY(-2px); }
+   298→   298→    .calendar-day.today { border: 2px solid #2a5298; }
+   299→   299→    .calendar-day.other-month { opacity: 0.4; }
+   300→   300→    .calendar-day .day-number { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+   301→   301→    .calendar-day .day-stats { display: flex; flex-direction: column; gap: 3px; }
+   302→   302→    .calendar-stat { display: flex; justify-content: space-between; font-size: 9px; padding: 2px 4px; border-radius: 3px; }
+   303→   303→    .calendar-stat.plan-meetings { background: #d4edda; color: #155724; }
+   304→   304→    .calendar-stat.plan-contracts { background: #cce5ff; color: #004085; }
+   305→   305→    .calendar-stat.fact-contracts { background: #fff3cd; color: #856404; }
+   306→   306→    .calendar-stat.fact-issued { background: #e2d5f1; color: #4a235a; }
+   307→   307→    .calendar-stat .stat-label { font-weight: 600; }
+   308→   308→    .calendar-stat .stat-value { font-weight: 700; }
+   309→   309→    
+   310→   310→    .calendar-day-modal .day-detail { padding: 10px; background: #f8f9fa; border-radius: 6px; margin-bottom: 8px; }
+   311→   311→    .calendar-day-modal .day-detail label { font-size: 11px; font-weight: 600; color: #2a5298; }
+   312→   312→    .calendar-day-modal .day-detail input { width: 60px; padding: 4px; text-align: center; border: 1px solid #ddd; border-radius: 4px; }
+   313→   313→    
+   314→   314→    /* ИСТОРИЯ */
+   315→   315→    .history-list { max-height: 500px; overflow-y: auto; background: white; border-radius: 6px; padding: 10px; }
+   316→   316→    .history-item { padding: 8px 12px; border-bottom: 1px solid #eee; font-size: 11px; display: flex; gap: 10px; }
+   317→   317→    .history-item:hover { background: #f8f9fa; }
+   318→   318→    .history-time { color: #7f8c8d; min-width: 120px; font-size: 10px; }
+   319→   319→    .history-action { flex: 1; }
+   320→   320→    .history-type { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 9px; font-weight: 600; margin-right: 5px; }
+   321→   321→    .history-type.add { background: #d4edda; color: #155724; }
+   322→   322→    .history-type.edit { background: #fff3cd; color: #856404; }
+   323→   323→    .history-type.delete { background: #f8d7da; color: #721c24; }
+   324→   324→    .history-type.bulk { background: #d1ecf1; color: #0c5460; }
+   325→   325→    
+   326→   326→    /* МОДАЛЬНЫЕ ОКНА */
+   327→   327→    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+   328→   328→    .modal.active { display: flex; }
+   329→   329→    .modal-content { background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 700px; max-height: 85vh; overflow-y: auto; }
+   330→   330→    .modal-content.small { max-width: 450px; }
+   331→   331→    .modal-content h2 { margin-bottom: 15px; color: #2c3e50; font-size: 16px; }
+   332→   332→    .modal-content label { display: block; margin-top: 8px; font-weight: 500; font-size: 12px; }
+   333→   333→    .modal-content input, .modal-content select, .modal-content textarea { width: 100%; padding: 7px; margin-top: 3px; border: 1px solid #ddd; border-radius: 5px; font-size: 12px; }
+   334→   334→    .modal-actions { margin-top: 15px; display: flex; gap: 8px; justify-content: flex-end; }
+   335→   335→    .modal-actions button { padding: 7px 15px; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; }
+   336→   336→    .btn-cancel { background: #e0e0e0; color: #333; }
+   337→   337→    .btn-confirm { background: #2a5298; color: white; }
+   338→   338→    .btn-danger { background: #dc3545; color: white; }
+   339→   339→    .btn-step { background: #28a745; color: white; }
+   340→   340→    
+   341→   341→    .step-form { padding: 15px; background: #f8f9fa; border-radius: 8px; margin-bottom: 10px; }
+   342→   342→    .step-form .step-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #2a5298; }
+   343→   343→    .step-indicator { display: flex; justify-content: center; gap: 6px; margin-bottom: 15px; }
+   344→   344→    .step-dot { width: 8px; height: 8px; border-radius: 50%; background: #ddd; }
+   345→   345→    .step-dot.active { background: #2a5298; transform: scale(1.3); }
+   346→   346→    .step-dot.done { background: #28a745; }
+   347→   347→    
+   348→   348→    .channels-list { border: 1px solid #e0e0e0; border-radius: 6px; overflow: hidden; margin-top: 10px; max-height: 300px; overflow-y: auto; }
+   349→   349→    .channel-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid #e0e0e0; background: white; }
+   350→   350→    .channel-item:hover { background: #f8f9fa; }
+   351→   351→    .channel-item:last-child { border-bottom: none; }
+   352→   352→    .channel-item .channel-name { flex: 1; font-size: 12px; }
+   353→   353→    .channel-item .channel-group { font-size: 10px; color: #7f8c8d; background: #f0f2f5; padding: 2px 6px; border-radius: 3px; }
+   354→   354→    .channel-item button { padding: 3px 7px; font-size: 10px; border: 1px solid #ddd; border-radius: 3px; background: white; cursor: pointer; }
+   355→   355→    .channel-item button.danger { color: #dc3545; border-color: #dc3545; }
+   356→   356→    
+   357→   357→    .add-channel-form { margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 6px; }
+   358→   358→    .add-channel-form h3 { font-size: 12px; margin-bottom: 8px; }
+   359→   359→    
+   360→   360→    /* Контекстные меню */
+   361→   361→    .context-menu { position: fixed; background: white; border: 1px solid #ddd; border-radius: 5px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1500; display: none; min-width: 200px; }
+   362→   362→    .context-menu.active { display: block; }
+   363→   363→    .context-menu-item { padding: 7px 12px; cursor: pointer; font-size: 11px; }
+   364→   364→    .context-menu-item:hover { background: #f0f2f5; }
+   365→   365→    .context-menu-item.danger { color: #dc3545; }
+   366→   366→    .context-menu-separator { height: 1px; background: #e0e0e0; margin: 2px 0; }
+   367→   367→    
+   368→   368→    .shortcuts-hint { position: fixed; bottom: 60px; left: 20px; background: rgba(0,0,0,0.8); color: white; padding: 10px 15px; border-radius: 6px; font-size: 10px; z-index: 1000; display: none; max-width: 250px; }
+   369→   369→    .shortcuts-hint.active { display: block; }
+   370→   370→    .shortcuts-hint kbd { background: rgba(255,255,255,0.2); padding: 1px 5px; border-radius: 3px; font-family: monospace; margin: 0 2px; }
+   371→   371→    
+   372→   372→    .toast { position: fixed; bottom: 15px; right: 15px; background: #28a745; color: white; padding: 8px 15px; border-radius: 6px; z-index: 2000; font-size: 12px; max-width: 300px; }
+   373→   373→    .toast.error { background: #dc3545; }
+   374→   374→    .toast.warning { background: #ffc107; color: #333; }
+   375→   375→</style>
+   376→   376→</head>
+   377→   377→<body>
+   378→   378→
+   379→   379→<div class="app-header">
+   380→   380→    <div>
+   381→   381→        <h1>🚗 CRM Отдел продаж</h1>
+   382→   382→        <p>Управление сделками и аналитика</p>
+   383→   383→    </div>
+   384→   384→    <div class="right-section">
+   385→   385→        <div class="global-search">
+   386→   386→            <span style="margin-right: 5px;">🔍</span>
+   387→   387→            <input type="text" id="globalSearchInput" placeholder="Поиск..." oninput="performGlobalSearch()" onfocus="showSearchResults()" onblur="setTimeout(hideSearchResults, 200)">
+   388→   388→            <div class="global-search-results" id="globalSearchResults"></div>
+   389→   389→        </div>
+   390→   390→        <div class="backup-status" id="backupStatus"><span id="backupStatusText">💾 Автосохранение</span></div>
+   391→   391→        <div id="currentDate"></div>
+   392→   392→    </div>
+   393→   393→</div>
+   394→   394→
+   395→   395→<div class="tabs-bar">
+   396→   396→    <button class="tab-btn active" data-tab="sklad">📦 Склад</button>
+   397→   397→    <button class="tab-btn" data-tab="traffic">📊 Трафик</button>
+   398→   398→    <button class="tab-btn" data-tab="planfact">📋 План/Факт</button>
+   399→   399→    <button class="tab-btn" data-tab="analytics">📈 Аналитика</button>
+   400→   400→    <button class="tab-btn" data-tab="calendar">📅 Календарь</button>
+   401→   401→    <button class="tab-btn" data-tab="history">📜 История</button>
+   402→   402→</div>
+   403→   403→
+   404→   404→<!-- СКЛАД -->
+   405→   405→<div class="tab-content active" id="tab-sklad">
+   406→   406→    <div class="toolbar">
+   407→   407→        <button class="primary" onclick="openStepForm()">➕ Добавить</button>
+   408→   408→        <button onclick="duplicateRow('sklad')">📋 Дублировать</button>
+   409→   409→        <div class="separator"></div>
+   410→   410→        <button onclick="openBulkDeleteModal('sklad')">🗑️ Массовое</button>
+   411→   411→        <div class="separator"></div>
+   412→   412→        <button class="success" onclick="saveFullBackup()">💾 Бэкап</button>
+   413→   413→        <button onclick="exportCSV('sklad')">📥 CSV</button>
+   414→   414→        <button onclick="exportToExcel()">📊 Excel</button>
+   415→   415→        <button onclick="document.getElementById('import-sklad').click()">📤 Импорт</button>
+   416→   416→        <input type="file" id="import-sklad" accept=".csv,.xlsx,.xls" style="display:none" onchange="importFile(event, 'sklad')">
+   417→   417→        <div class="separator"></div>
+   418→   418→        <button onclick="printReport()">🖨️ Печать</button>
+   419→   419→        <div class="stats" id="stats-sklad"></div>
+   420→   420→    </div>
+   421→   421→    <div class="bulk-actions" id="bulkActions-sklad">
+   422→   422→        <span>Выбрано: <span class="count" id="bulkCount-sklad">0</span></span>
+   423→   423→        <button class="danger" onclick="deleteSelectedRows('sklad')">🗑️ Удалить</button>
+   424→   424→        <button onclick="clearSelection('sklad')">✖ Снять</button>
+   425→   425→    </div>
+   426→   426→    <div class="filters" id="filters-sklad"></div>
+   427→   427→    <div class="ti-hint">💡 <strong>ТИ</strong>: ПКМ → ссылка. <strong>Стрелки</strong> — навигация. <kbd>Ctrl+A</kbd> — выделить все.</div>
+   428→   428→    <div class="table-wrapper">
+   429→   429→        <table id="table-sklad">
+   430→   430→            <colgroup id="colgroup-sklad"></colgroup>
+   431→   431→            <thead><tr id="thead-sklad"></tr></thead>
+   432→   432→            <tbody id="tbody-sklad"></tbody>
+   433→   433→        </table>
+   434→   434→    </div>
+   435→   435→</div>
+   436→   436→
+   437→   437→<!-- ТРАФИК -->
+   438→   438→<div class="tab-content" id="tab-traffic">
+   439→   439→    <div class="toolbar">
+   440→   440→        <label>📅 Месяц: <input type="month" id="traffic-month" onchange="renderTrafficTables()"></label>
+   441→   441→        <div class="separator"></div>
+   442→   442→        <label>С: <input type="date" id="traffic-date-from" onchange="renderTrafficTables()"></label>
+   443→   443→        <label>По: <input type="date" id="traffic-date-to" onchange="renderTrafficTables()"></label>
+   444→   444→        <button onclick="setTrafficDateRange('week')">Неделя</button>
+   445→   445→        <button onclick="setTrafficDateRange('month')">Месяц</button>
+   446→   446→        <button onclick="setTrafficDateRange('quarter')">Квартал</button>
+   447→   447→        <button onclick="clearTrafficDateRange()">Сброс</button>
+   448→   448→        <div class="separator"></div>
+   449→   449→        <button class="success" onclick="exportTrafficToExcel()">📊 Excel</button>
+   450→   450→        <button onclick="exportTrafficCSV()">📥 CSV</button>
+   451→   451→        <div class="stats" id="stats-traffic"></div>
+   452→   452→    </div>
+   453→   453→    <div class="traffic-content">
+   454→   454→        <div class="forecast-section" id="forecast-section"></div>
+   455→   455→        <div class="traffic-header-kpi" id="traffic-header-kpi"></div>
+   456→   456→        <div class="traffic-section">
+   457→   457→            <div class="traffic-section-header calls">📞 Звонки и Заявки</div>
+   458→   458→            <div class="traffic-table-wrapper">
+   459→   459→                <table class="traffic-table" id="calls-table"><thead id="calls-thead"></thead><tbody id="calls-tbody"></tbody></table>
+   460→   460→            </div>
+   461→   461→            <div class="traffic-weeks-summary" id="calls-weeks"></div>
+   462→   462→        </div>
+   463→   463→        <div class="traffic-section">
+   464→   464→            <div class="traffic-section-header visits">🚶 Визиты в салон</div>
+   465→   465→            <div class="traffic-table-wrapper">
+   466→   466→                <table class="traffic-table" id="visits-table"><thead id="visits-thead"></thead><tbody id="visits-tbody"></tbody></table>
+   467→   467→            </div>
+   468→   468→            <div class="traffic-weeks-summary" id="visits-weeks"></div>
+   469→   469→        </div>
+   470→   470→        <div class="traffic-section">
+   471→   471→            <div class="traffic-section-header total">💼 Общий банк контрактов</div>
+   472→   472→            <div class="traffic-table-wrapper">
+   473→   473→                <table class="traffic-table" id="total-table"><thead id="total-thead"></thead><tbody id="total-tbody"></tbody></table>
+   474→   474→            </div>
+   475→   475→        </div>
+   476→   476→    </div>
+   477→   477→</div>
+   478→   478→
+   479→   479→<!-- ПЛАН/ФАКТ -->
+   480→   480→<div class="tab-content" id="tab-planfact">
+   481→   481→    <div class="toolbar">
+   482→   482→        <label>📅 Месяц: <select id="planfact-month" onchange="renderPlanFactTable()"></select></label>
+   483→   483→        <div class="separator"></div>
+   484→   484→        <button class="success" onclick="exportPlanFactToExcel()">📊 Экспорт Excel</button>
+   485→   485→        <button onclick="document.getElementById('import-planfact').click()">📤 Импорт</button>
+   486→   486→        <input type="file" id="import-planfact" accept=".xlsx,.xls" style="display:none" onchange="importPlanFactFromExcel(event)">
+   487→   487→        <div class="separator"></div>
+   488→   488→        <button onclick="openChannelsSettings()">⚙️ Настройки каналов</button>
+   489→   489→        <button onclick="recalculateAll()">🔄 Пересчитать</button>
+   490→   490→    </div>
+   491→   491→    <div class="plan-fact-content">
+   492→   492→        <div class="plan-fact-table-wrapper">
+   493→   493→            <table class="plan-fact-table" id="planfact-table">
+   494→   494→                <thead id="planfact-thead"></thead>
+   495→   495→                <tbody id="planfact-tbody"></tbody>
+   496→   496→            </table>
+   497→   497→        </div>
+   498→   498→    </div>
+   499→   499→</div>
+   500→   500→
+   501→   501→<!-- АНАЛИТИКА -->
+   502→   502→<div class="tab-content" id="tab-analytics">
+   503→   503→    <div class="analytics-content" id="analyticsContent"></div>
+   504→   504→</div>
+   505→   505→
+   506→   506→<!-- КАЛЕНДАРЬ -->
+   507→   507→<div class="tab-content" id="tab-calendar">
+   508→   508→    <div class="calendar-content" id="calendarContent"></div>
+   509→   509→</div>
+   510→   510→
+   511→   511→<!-- ИСТОРИЯ -->
+   512→   512→<div class="tab-content" id="tab-history">
+   513→   513→    <div class="analytics-content">
+   514→   514→        <h2>📜 История изменений</h2>
+   515→   515→        <div class="toolbar">
+   516→   516→            <button onclick="clearHistory()">🗑️ Очистить</button>
+   517→   517→            <button onclick="exportHistory()">📥 Экспорт</button>
+   518→   518→            <div class="stats">Всего: <b id="historyCount">0</b></div>
+   519→   519→        </div>
+   520→   520→        <div class="history-list" id="historyList"></div>
+   521→   521→    </div>
+   522→   522→</div>
+   523→   523→
+   524→   524→<!-- МОДАЛЬНЫЕ ОКНА -->
+   525→   525→<div class="context-menu" id="contextMenu">
+   526→   526→    <div class="context-menu-item" data-action="duplicate">📋 Дублировать</div>
+   527→   527→    <div class="context-menu-item" data-action="insertAbove">⬆️ Вставить выше</div>
+   528→   528→    <div class="context-menu-item" data-action="insertBelow">⬇️ Вставить ниже</div>
+   529→   529→    <div class="context-menu-separator"></div>
+   530→   530→    <div class="context-menu-item danger" data-action="delete">🗑️ Удалить</div>
+   531→   531→</div>
+   532→   532→
+   533→   533→<div class="context-menu" id="tiContextMenu">
+   534→   534→    <div class="context-menu-item" data-action="addLink">🔗 Внести ссылку</div>
+   535→   535→    <div class="context-menu-item" data-action="openLink">🌐 Открыть</div>
+   536→   536→    <div class="context-menu-separator"></div>
+   537→   537→    <div class="context-menu-item" data-action="editLink">✏️ Редактировать</div>
+   538→   538→    <div class="context-menu-item danger" data-action="removeLink">🗑️ Удалить</div>
+   539→   539→</div>
+   540→   540→
+   541→   541→<div class="context-menu" id="commentContextMenu">
+   542→   542→    <div class="context-menu-item" data-action="addComment">💬 Добавить</div>
+   543→   543→    <div class="context-menu-item" data-action="editComment">✏️ Редактировать</div>
+   544→   544→    <div class="context-menu-separator"></div>
+   545→   545→    <div class="context-menu-item danger" data-action="removeComment">🗑️ Удалить</div>
+   546→   546→</div>
+   547→   547→
+   548→   548→<div class="context-menu" id="headerContextMenu">
+   549→   549→    <div class="context-menu-item" data-action="rename">✏️ Переименовать</div>
+   550→   550→    <div class="context-menu-item" data-action="changeType">🔄 Изменить тип</div>
+   551→   551→    <div class="context-menu-item" data-action="insertLeft">⬅️ Вставить слева</div>
+   552→   552→    <div class="context-menu-item" data-action="insertRight">➡️ Вставить справа</div>
+   553→   553→    <div class="context-menu-separator"></div>
+   554→   554→    <div class="context-menu-item danger" data-action="deleteCol">🗑️ Удалить</div>
+   555→   555→</div>
+   556→   556→
+   557→   557→<div class="modal" id="settingsModal">
+   558→   558→    <div class="modal-content">
+   559→   559→        <h2>⚙️ Настройки таблицы</h2>
+   560→   560→        <div class="columns-list" id="columnsList"></div>
+   561→   561→        <div style="margin-top:10px; padding:10px; background:#f8f9fa; border-radius:6px;">
+   562→   562→            <h3 style="font-size:12px; margin-bottom:6px;">➕ Добавить столбец</h3>
+   563→   563→            <label>Название:</label>
+   564→   564→            <input type="text" id="newColumnName">
+   565→   565→            <label>Тип:</label>
+   566→   566→            <select id="newColumnType">
+   567→   567→                <option value="text">Текст</option>
+   568→   568→                <option value="number">Число</option>
+   569→   569→                <option value="date">Дата</option>
+   570→   570→                <option value="url">Ссылка</option>
+   571→   571→                <option value="select">Список</option>
+   572→   572→            </select>
+   573→   573→            <div id="newColumnOptionsDiv" style="display:none; margin-top:6px;">
+   574→   574→                <label>Значения (через запятую):</label>
+   575→   575→                <input type="text" id="newColumnOptions">
+   576→   576→            </div>
+   577→   577→            <button class="btn-confirm" style="margin-top:6px;" onclick="addColumn()">Добавить</button>
+   578→   578→        </div>
+   579→   579→        <div class="modal-actions">
+   580→   580→            <button class="btn-cancel" onclick="closeSettings()">Закрыть</button>
+   581→   581→        </div>
+   582→   582→    </div>
+   583→   583→</div>
+   584→   584→
+   585→   585→<div class="modal" id="linkModal">
+   586→   586→    <div class="modal-content small">
+   587→   587→        <h2>🔗 Ссылка на оценку</h2>
+   588→   588→        <p style="color:#7f8c8d; font-size:11px; margin-bottom:10px;" id="linkModalInfo"></p>
+   589→   589→        <label>URL:</label>
+   590→   590→        <input type="url" id="linkModalInput" placeholder="https://..." onkeydown="if(event.key==='Enter') saveLink()">
+   591→   591→        <div class="modal-actions">
+   592→   592→            <button class="btn-cancel" onclick="closeLinkModal()">Отмена</button>
+   593→   593→            <button class="btn-confirm" onclick="saveLink()">💾 Сохранить</button>
+   594→   594→        </div>
+   595→   595→    </div>
+   596→   596→</div>
+   597→   597→
+   598→   598→<div class="modal" id="linksArchiveModal">
+   599→   599→    <div class="modal-content">
+   600→   600→        <h2>🔗 Архив ссылок</h2>
+   601→   601→        <div id="linksArchiveList" style="max-height:400px; overflow-y:auto;"></div>
+   602→   602→        <div class="modal-actions">
+   603→   603→            <button class="btn-danger" onclick="clearLinksArchive()">🗑️ Очистить</button>
+   604→   604→            <button class="btn-cancel" onclick="closeLinksArchive()">Закрыть</button>
+   605→   605→        </div>
+   606→   606→    </div>
+   607→   607→</div>
+   608→   608→
+   609→   609→<div class="modal" id="stepFormModal">
+   610→   610→    <div class="modal-content small">
+   611→   611→        <h2>➕ Новая сделка</h2>
+   612→   612→        <div class="step-indicator" id="stepIndicator"></div>
+   613→   613→        <div id="stepFormContent"></div>
+   614→   614→        <div class="modal-actions">
+   615→   615→            <button class="btn-cancel" onclick="closeStepForm()">Отмена</button>
+   616→   616→            <button class="btn-cancel" id="stepPrevBtn" style="display:none;" onclick="stepFormPrev()">← Назад</button>
+   617→   617→            <button class="btn-step" id="stepNextBtn" onclick="stepFormNext()">Далее →</button>
+   618→   618→        </div>
+   619→   619→    </div>
+   620→   620→</div>
+   621→   621→
+   622→   622→<div class="modal" id="calendarDayModal">
+   623→   623→    <div class="modal-content small calendar-day-modal">
+   624→   624→        <h2 id="calendarDayTitle">📅 День</h2>
+   625→   625→        <div id="calendarDayContent"></div>
+   626→   626→        <div class="modal-actions">
+   627→   627→            <button class="btn-confirm" onclick="closeCalendarDayModal()">Закрыть</button>
+   628→   628→        </div>
+   629→   629→    </div>
+   630→   630→</div>
+   631→   631→
+   632→   632→<div class="modal" id="bulkDeleteModal">
+   633→   633→    <div class="modal-content small">
+   634→   634→        <h2>🗑️ Массовое удаление</h2>
+   635→   635→        <label>Статус:</label>
+   636→   636→        <select id="bulkDeleteStatus">
+   637→   637→            <option value="">Все</option>
+   638→   638→            <option value="Продан">Продан</option>
+   639→   639→            <option value="Склад">Склад</option>
+   640→   640→            <option value="Отказ">Отказ</option>
+   641→   641→        </select>
+   642→   642→        <label>Модель:</label>
+   643→   643→        <select id="bulkDeleteModel"><option value="">Все</option></select>
+   644→   644→        <label>Период (с):</label>
+   645→   645→        <input type="date" id="bulkDeleteFrom">
+   646→   646→        <label>Период (по):</label>
+   647→   647→        <input type="date" id="bulkDeleteTo">
+   648→   648→        <p style="margin-top:10px; color:#dc3545; font-size:11px;">⚠️ Будет удалено: <b id="bulkDeleteCount">0</b> строк</p>
+   649→   649→        <div class="modal-actions">
+   650→   650→            <button class="btn-cancel" onclick="closeBulkDeleteModal()">Отмена</button>
+   651→   651→            <button class="btn-danger" onclick="executeBulkDelete()">🗑️ Удалить</button>
+   652→   652→        </div>
+   653→   653→    </div>
+   654→   654→</div>
+   655→   655→
+   656→   656→<div class="modal" id="channelsModal">
+   657→   657→    <div class="modal-content">
+   658→   658→        <h2>⚙️ Настройки каналов трафика</h2>
+   659→   659→        <div id="channelsList"></div>
+   660→   660→        <div class="add-channel-form">
+   661→   661→            <h3>➕ Добавить канал</h3>
+   662→   662→            <label>Название:</label>
+   663→   663→            <input type="text" id="newChannelName">
+   664→   664→            <label>Группа:</label>
+   665→   665→            <select id="newChannelGroup"></select>
+   666→   666→            <label>Бюджет:</label>
+   667→   667→            <input type="number" id="newChannelBudget" value="0">
+   668→   668→            <label>CPL:</label>
+   669→   669→            <input type="number" id="newChannelCPL" value="0">
+   670→   670→            <label>РЛ:</label>
+   671→   671→            <input type="number" id="newChannelRL" value="0">
+   672→   672→            <label>SR%:</label>
+   673→   673→            <input type="number" id="newChannelSR" value="0" step="0.1">
+   674→   674→            <button class="btn-confirm" style="margin-top:8px;" onclick="addChannel()">Добавить</button>
+   675→   675→        </div>
+   676→   676→        <div class="modal-actions">
+   677→   677→            <button class="btn-cancel" onclick="closeChannelsSettings()">Закрыть</button>
+   678→   678→        </div>
+   679→   679→    </div>
+   680→   680→</div>
+   681→   681→
+   682→   682→<div class="shortcuts-hint" id="shortcutsHint">
+   683→   683→    <div><kbd>←↑→↓</kbd> Навигация</div>
+   684→   684→    <div><kbd>Ctrl+A</kbd> Выделить все</div>
+   685→   685→    <div><kbd>Ctrl+S</kbd> Бэкап</div>
+   686→   686→    <div><kbd>Ctrl+F</kbd> Поиск</div>
+   687→   687→    <div><kbd>Ctrl+P</kbd> Печать</div>
+   688→   688→    <div><kbd>?</kbd> Эта подсказка</div>
+   689→   689→</div>
+   690→   690→
+   691→   691→<script>
+   692→   692→// ДАННЫЕ
+   693→   693→function getDefaultSkladData() {
+   694→   694→    return [
+   695→   695→        { id: 1, model: 'Tenet T7', status: 'Отказ', dateDkp: '2026-05-29', dateIssued: '', seller: 'Лавреев Сергей', client: 'Угрюмов Сергей Александрович', jok: 0, j: 0, o: 0, k: 0, risk: '4', kr: '0', ti: '1', review: 'Нет отзыва', traffic: '🚶 Визит', comment: 'Купил джолион у нас' },
+   696→   696→        { id: 2, model: 'Tenet T7', status: 'Продан', dateDkp: '2026-06-01', dateIssued: '2026-06-01', seller: 'Мелузов Евгений', client: 'Матюнин Андрей Валентинович', jok: 162541, j: -19746, o: 0, k: 182287, risk: '1', kr: '1', ti: '1', review: 'Нет отзыва', traffic: '📞 Звонок', comment: 'Выдана' },
+   697→   697→        { id: 3, model: 'Tenet T4L', status: 'Продан', dateDkp: '2026-06-03', dateIssued: '2026-06-03', seller: 'Буц Виктория', client: 'Евдокимова Елена Васильевна', jok: 140750, j: -39717, o: 0, k: 180467, risk: '1', kr: '1', ti: '1', review: 'Нет отзыва', traffic: '📝 Заявка', comment: 'Выдана' },
+   698→   698→        { id: 4, model: 'Tenet T7', status: 'Продан', dateDkp: '2026-06-03', dateIssued: '2026-06-03', seller: 'Буц Виктория', client: 'Кузнецов Александр Сергеевич', jok: 181429, j: 24622, o: 0, k: 156807, risk: '1', kr: '1', ti: '0', review: 'Нет отзыва', traffic: '🚶 Визит', comment: 'Выдана' },
+   699→   699→        { id: 5, model: 'Tenet T4', status: 'Продан', dateDkp: '2026-06-04', dateIssued: '2026-06-04', seller: 'Алексеев Владимир', client: 'Григорьев Сергей Павлович', jok: 205796, j: 6324, o: 0, k: 199472, risk: '1', kr: '1', ti: '1', review: 'Яндекс карты', traffic: '🚶 Визит', comment: 'Выдана' }
+   700→   700→    ];
+   701→
+   702→[showing lines 1-700 of 2983; use offset=701 with limit to continue reading]
