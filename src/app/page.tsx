@@ -96,7 +96,7 @@ export default function HomePage() {
     loadHistory()
     const t = setTimeout(() => setInitialLoading(false), 800)
     return () => clearTimeout(t)
-  }, [loadDeals, loadColumns, loadOptions, loadChannels, loadStats, loadComments, loadEvalLinks, loadHistory])
+  }, [user, loadDeals, loadColumns, loadOptions, loadChannels, loadStats, loadComments, loadEvalLinks, loadHistory])
 
   const debouncedSearch = useDebouncedCallback((q: string) => {
     loadDeals(q ? { search: q } : undefined)
