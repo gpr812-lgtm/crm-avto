@@ -106,8 +106,8 @@ export function CalendarTab() {
 
   return (
     <div className="h-full overflow-auto crm-scroll p-3 space-y-3">
-      {/* Toolbar — всё в одну линию */}
-      <Card className="p-2.5 flex items-center gap-2 flex-nowrap text-xs overflow-x-auto crm-scroll">
+      {/* Toolbar — всё в одну линию по горизонтали */}
+      <div className="bg-white border border-[hsl(220,16%,90%)] rounded-lg p-2.5 flex items-center gap-2 flex-nowrap text-xs overflow-x-auto crm-scroll shadow-sm">
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <Button size="sm" variant="ghost" onClick={prevMonth} className="h-7 w-7 p-0"><ChevronLeft className="w-4 h-4" /></Button>
           <span className="font-semibold min-w-36 text-center text-sm whitespace-nowrap">
@@ -120,7 +120,7 @@ export function CalendarTab() {
         <Badge variant="outline" className="whitespace-nowrap bg-[hsl(220,20%,95%)] flex-shrink-0">📋 План: {totals.contracts}</Badge>
         <Badge className="bg-[hsl(142,60%,35%)] hover:bg-[hsl(142,60%,35%)] whitespace-nowrap flex-shrink-0">📄 Факт: {totals.factContracts}</Badge>
         <Badge className="bg-[hsl(217,91%,45%)] hover:bg-[hsl(217,91%,45%)] whitespace-nowrap flex-shrink-0">📤 Выдачи: {totals.factIssued}</Badge>
-      </Card>
+      </div>
 
       {/* Calendar grid */}
       <Card className="p-3">
