@@ -151,22 +151,22 @@ export function CalendarTab() {
                 </div>
                 <div>
                   {(p.meetings > 0 || p.contracts > 0 || f.contracts > 0 || f.issued > 0) ? (
-                    <div className="space-y-0.5">
+                    <div className="flex items-center justify-center gap-1.5 text-sm flex-wrap">
                       {p.meetings > 0 && (
-                        <div className="text-xs text-[#6a1b9a] font-medium">📅 {p.meetings}</div>
+                        <span className="text-[#6a1b9a] font-bold">📅{p.meetings}</span>
                       )}
                       {p.contracts > 0 && (
-                        <div className="text-xs text-[#f57f17] font-medium">📋 {p.contracts}</div>
+                        <span className="text-[#f57f17] font-bold">📋{p.contracts}</span>
                       )}
                       {f.contracts > 0 && (
-                        <div className="text-xs text-[#28a745] font-medium">📄 {f.contracts}</div>
+                        <span className="text-[#28a745] font-bold">📄{f.contracts}</span>
                       )}
                       {f.issued > 0 && (
-                        <div className="text-xs text-[#1a73e8] font-medium">📤 {f.issued}</div>
+                        <span className="text-[#1a73e8] font-bold">📤{f.issued}</span>
                       )}
                     </div>
                   ) : (
-                    <div className="text-xs text-[#bbb]">+</div>
+                    <div className="text-sm text-[#bbb]">+</div>
                   )}
                 </div>
               </button>
