@@ -1,39 +1,27 @@
-# dependencies
-node_modules
-
-# next.js
+node_modules/
 .next/
 out/
-
-# database (local SQLite)
 db/
 *.db
 *.db-journal
-
-# environment
 .env
 .env.local
 .env.production
 prisma/.env
-
-# logs
 dev.log
 server.log
 *.log
-
-# OS
 .DS_Store
 Thumbs.db
-
-# IDE
-.idea
-.vscode
-
-# upload (temp files)
+.idea/
+.vscode/
 upload/
-
-# tool-results
 tool-results/
-
-# zscripts
 .zscripts/
+skills/
+examples/
+mini-services/
+download/
+worklog.md
+Caddyfile
+bun.lock
