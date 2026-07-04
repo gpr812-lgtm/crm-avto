@@ -26,14 +26,20 @@ import {
 } from '@/components/ui/dialog'
 import { highlightMatch } from '@/lib/utils-crm'
 import type { TabKey, Deal } from '@/lib/types'
+import { useAuthStore } from '@/lib/auth-store'
+import { useRouter } from 'next/navigation'
+import { DealershipDropdown } from '@/components/crm/dealership-dropdown'
+import { SettingsTab } from '@/components/crm/settings-tab'
+import { LogOut, Settings as SettingsIcon } from 'lucide-react'
 
-const TABS: { key: TabKey; label: string; icon: string }[] = [
+const ALL_TABS: { key: TabKey; label: string; icon: string }[] = [
   { key: 'sklad', label: 'Склад', icon: '📦' },
   { key: 'traffic', label: 'Трафик', icon: '📊' },
   { key: 'planfact', label: 'План/Факт', icon: '📋' },
   { key: 'analytics', label: 'Аналитика', icon: '📈' },
   { key: 'calendar', label: 'Календарь', icon: '📅' },
   { key: 'history', label: 'История', icon: '📜' },
+  { key: 'settings', label: 'Настройки', icon: '⚙️' },
 ]
 
 const KEYBOARD_SHORTCUTS = [
@@ -45,6 +51,8 @@ const KEYBOARD_SHORTCUTS = [
 ]
 
 export default function HomePage() {
+  const router = useRouter()
+  const { user, loading: authLoading, loadUser, logout, hasTabAccess } = useAuthStore()
   const {
     activeTab, setActiveTab,
     deals, columns, options,
@@ -61,8 +69,23 @@ export default function HomePage() {
   const [searchFocused, setSearchFocused] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
 
-  // Initial load
+  // Auth check — redirect to /login if not authenticated
   useEffect(() => {
+    loadUser()
+  }, [loadUser])
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/login')
+    }
+  }, [user, authLoading, router])
+
+  // Filter tabs by user access
+  const TABS = ALL_TABS.filter((t) => hasTabAccess(t.key))
+
+  // Initial data load (only after auth confirmed)
+  useEffect(() => {
+    if (!user) return
     loadDeals()
     loadColumns()
     loadOptions()
@@ -148,6 +171,20 @@ export default function HomePage() {
 
   // Show skeleton on initial load
   const showSkeleton = initialLoading || loading.deals
+
+  // Show loading screen while checking auth
+  if (authLoading || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[hsl(220,23%,96%)]">
+        <div className="text-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl crm-header-gradient flex items-center justify-center crm-pulse">
+            <Car className="w-8 h-8 text-white" />
+          </div>
+          <p className="text-sm text-[hsl(215,16%,47%)]">Загрузка CRM...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
@@ -259,6 +296,25 @@ export default function HomePage() {
             </Button>
           </div>
 
+          {/* Dealership selector */}
+          <DealershipDropdown />
+
+          {/* User menu */}
+          <div className="flex items-center gap-1 bg-white/10 rounded-md p-0.5 border border-white/10">
+            <span className="text-[10px] text-white/80 px-1 hidden md:block whitespace-nowrap">
+              {user?.name}
+            </span>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={logout}
+              className="text-white hover:bg-white/15 h-7 px-2"
+              title="Выйти"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+
           <div className="text-[11px] opacity-75 hidden lg:flex items-center gap-1 pl-2 border-l border-white/15">
             <Calendar className="w-3 h-3" />
             {todayStr}
@@ -306,6 +362,7 @@ export default function HomePage() {
           {activeTab === 'analytics' && <AnalyticsTab />}
           {activeTab === 'calendar' && <CalendarTab />}
           {activeTab === 'history' && <HistoryTab />}
+          {activeTab === 'settings' && <SettingsTab />}
         </div>
       </main>
 

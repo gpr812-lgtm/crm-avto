@@ -84,4 +84,4 @@ export interface Stats {
   krCount: number
 }
 
-export type TabKey = 'sklad' | 'traffic' | 'planfact' | 'analytics' | 'calendar' | 'history'
+export type TabKey = 'sklad' | 'traffic' | 'planfact' | 'analytics' | 'calendar' | 'history' | 'settings'

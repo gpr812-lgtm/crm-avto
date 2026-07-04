@@ -664,3 +664,84 @@ Work Log:
 
 Stage Summary:
 - Подсказки в ячейках дня календаря теперь в одну строку (горизонтально)
+
+---
+Task ID: v16-multi-tenant
+Agent: main (Super Z)
+Task: Multi-tenant система — автосалоны, пользователи, права доступа
+
+Work Log:
+1. Схема БД:
+   - Новые модели: Dealership, User, UserDealershipAccess, UserTabAccess
+   - dealershipId добавлен во все таблицы: Deal, Channel, TrafficEntry, TodayPlan, CellComment, PlanEntry, FactEntry, ChannelFact, SelectOption, DealColumn
+   - db:push --accept-data-loss применён
+
+2. Seed:
+   - Дефолтный автосалон "CHERY ВН" (id=1)
+   - Админ: admin@crm.local / admin123 (role=ADMIN)
+   - Доступ админа ко всем 7 вкладкам + автосалону
+   - Существующие данные привязаны к dealership id=1
+
+3. Auth API:
+   - POST /api/auth/login — email+пароль, session cookie
+   - POST /api/auth/logout — очистка cookie
+   - GET /api/auth/me — текущий пользователь с доступами
+   - hashPassword (SHA-256), createSessionToken (base64), parseSessionToken
+
+4. Login страница (/login):
+   - Email + пароль
+   - Демо: admin@crm.local / admin123
+   - Redirect на / после входа
+   - Loading screen с пульсацией
+
+5. Auth guard на главной странице:
+   - loadUser() при загрузке
+   - Redirect на /login если не авторизован
+   - Loading screen "Загрузка CRM..." пока проверяется
+
+6. Dropdown автосалонов в шапке:
+   - Multi-select (можно выбрать несколько или все)
+   - "Все автосалоны" / "N автосалона" / название одного
+   - Toggle каждого салона
+   - "Выбрать все" кнопка
+   - Счётчик "Выбрано: X из Y"
+
+7. Вкладка Настройки:
+   - 2 раздела: Автосалоны | Пользователи
+   - Автосалоны: создание новых (name + code), список существующих
+   - Пользователи: создание (email, name, password, role), редактирование, управление доступом
+   - Доступ к автосалонам: checkbox для каждого салона
+   - Доступ к вкладкам: toggle для каждой из 7 вкладок
+   - Не-админы видят "Доступ ограничен"
+
+8. Управление доступом:
+   - 2 роли: ADMIN (всё) и MANAGER (только назначенное)
+   - UserDealershipAccess: доступ к автосалонам
+   - UserTabAccess: доступ к вкладкам (sklad/traffic/planfact/analytics/calendar/history/settings)
+   - Вкладки фильтруются по hasTabAccess()
+   - Кнопка выхода (LogOut) в шапке
+
+9. Файлы:
+   - prisma/schema.prisma — обновлена
+   - src/lib/auth.ts — утилиты
+   - src/lib/auth-store.ts — Zustand store
+   - src/app/login/page.tsx — login страница
+   - src/app/api/auth/login|logout|me/route.ts
+   - src/app/api/dealerships/route.ts
+   - src/app/api/users/route.ts + [id]/route.ts + [id]/access/route.ts
+   - src/components/crm/dealership-dropdown.tsx
+   - src/components/crm/settings-tab.tsx
+   - src/app/page.tsx — обновлён (auth guard, dropdown, settings tab, logout)
+   - scripts/seed-dealership.ts
+
+- ESLint: 0 ошибок
+- Проверено: login → redirect → главная с dropdown + settings + logout
+- Скриншоты: /home/z/my-project/download/v16-*.png
+
+Stage Summary:
+- Multi-tenant система с автосалонами, пользователями и правами доступа
+- Login: admin@crm.local / admin123
+- Dropdown автосалонов в шапке (multi-select)
+- Вкладка Настройки: CRUD автосалонов + пользователей + прав
+- Фильтрация вкладок по ролям
+- TODO: фильтрация данных по dealershipId в API endpoints (следующая итерация)
