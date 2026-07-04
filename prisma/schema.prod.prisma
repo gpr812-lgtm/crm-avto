@@ -1,0 +1,335 @@
+// CRM "Отдел продаж" — Prisma schema (multi-tenant)
+// SQLite для разработки, легко мигрировать на PostgreSQL для production
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================
+// Автосалоны (Dealerships)
+// ============================
+
+model Dealership {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  code        String?  // короткий код, например "CHERY-ВН"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  deals         Deal[]
+  channels      Channel[]
+  trafficEntries TrafficEntry[]
+  todayPlans    TodayPlan[]
+  cellComments  CellComment[]
+  factEntries   FactEntry[]
+  channelFacts  ChannelFact[]
+  selectOptions SelectOption[]
+  dealColumns   DealColumn[]
+  userAccess    UserDealershipAccess[]
+}
+
+// ============================
+// Пользователи и доступ
+// ============================
+
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         String   @default("MANAGER") // 'ADMIN' | 'MANAGER'
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  dealershipAccess UserDealershipAccess[]
+  tabAccess        UserTabAccess[]
+}
+
+// Доступ пользователя к автосалонам (many-to-many)
+model UserDealershipAccess {
+  id           Int @id @default(autoincrement())
+  userId       Int
+  dealershipId Int
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dealership Dealership @relation(fields: [dealershipId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dealershipId])
+}
+
+// Доступ пользователя к вкладкам
+// tabKey: 'sklad' | 'traffic' | 'planfact' | 'analytics' | 'calendar' | 'history' | 'settings'
+model UserTabAccess {
+  id     Int @id @default(autoincrement())
+  userId Int
+  tabKey String
+  allowed Boolean @default(true)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tabKey])
+}
+
+// ============================
+// Справочники (select options) — привязаны к автосалону
+// ============================
+
+model SelectOption {
+  id            Int      @id @default(autoincrement())
+  dealershipId  Int?
+  dictName      String   // 'model' | 'status' | 'seller' | 'review' | 'traffic' | 'risk' | 'kr' | 'ti' | 'custom_*'
+  value         String
+  order         Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  dealership Dealership? @relation(fields: [dealershipId], references: [id], onDelete: Cascade)
+
+  @@unique([dealershipId, dictName, value])
+  @@index([dictName])
+}
+
+// ============================
+// Склад (главная таблица сделок) — привязан к автосалону
+// ============================
+
+model Deal {
+  id            String   @id @default(cuid())
+  dealershipId  Int?
+  model         String   @default("Tenet T7")
+  status        String   @default("Продан")
+  dateDkp       String?
+  dateIssued    String?
+  seller        String?
+  client        String?
+  jok           Float    @default(0)
+  j             Float    @default(0)
+  o             Float    @default(0)
+  k             Float    @default(0)
+  risk          String   @default("1")
+  kr            String   @default("0")
+  ti            String   @default("0")
+  review        String   @default("Нет отзыва")
+  traffic       String   @default("🚶 Визит")
+  comment       String?
+  order         Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  dealership     Dealership?  @relation(fields: [dealershipId], references: [id], onDelete: Cascade)
+  evaluationLink EvaluationLink?
+
+  @@index([dealershipId])
+  @@index([status])
+  @@index([model])
+  @@index([seller])
+  @@index([dateDkp])
+  @@index([dateIssued])
+}
+
+model DealColumn {
+  id            Int      @id @default(autoincrement())
+  dealershipId  Int?
+  key           String
+  label         String
+  type          String   @default("text")
+  options       String?
+  default       String?
+  width         Int      @default(100)
+  order         Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  dealership Dealership? @relation(fields: [dealershipId], references: [id], onDelete: Cascade)
+
+  @@unique([dealershipId, key])
+}
+
+// ============================
+// Трафик — привязан к автосалону
+// ============================
+
+model TrafficEntry {
+  id            Int      @id @default(autoincrement())
+  dealershipId  Int?
+  monthKey      String
+  model         String
+  type          String
+  day           Int
+  value         Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  dealership Dealership? @relation(fields: [dealershipId], references: [id], onDelete: Cascade)
+
+  @@unique([dealershipId, monthKey, model, type, day])
+  @@index([dealershipId, monthKey, model])
+  @@index([monthKey, type])
+}
+
+model TodayPlan {
+  id            Int      @id @default(autoincrement())
+  dealershipId  Int?
+  monthKey      String
+  day           Int
+  meetings      Int      @default(0)
+  contracts     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  dealership Dealership? @relation(fields: [dealershipId], references: [id], onDelete: Cascade)
+
+  @@unique([dealershipId, monthKey, day])
+}
+
+model CellComment {
+  id            Int      @id @default(autoincrement())
+  dealershipId  Int?
+  table         String
+  day           Int
+  model         String
+  text          String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  dealership Dealership? @relation(fields: [dealershipId], references: [id], onDelete: Cascade)
+
+  @@unique([dealershipId, table, day, model])
+}
+
+// ============================
+// Каналы трафика и План/Факт — привязаны к автосалону
+// ============================
+
+model Channel {
+  id            Int      @id @default(autoincrement())
+  dealershipId  Int?
+  name          String
+  group         String
+  budget        Float    @default(0)
+  cpl           Float    @default(0)
+  rl            Float    @default(0)
+  sr            Float    @default(0)
+  order         Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  dealership Dealership? @relation(fields: [dealershipId], references: [id], onDelete: Cascade)
+
+  @@unique([dealershipId, name])
+  @@index([dealershipId, group])
+}
+
+model PlanEntry {
+  id            Int      @id @default(autoincrement())
+  dealershipId  Int?
+  monthKey      String
+  channel       String
+  day           Int
+  leads         Int      @default(0)
+  budget        Float    @default(0)
+  cpl           Float    @default(0)
+  rl            Float    @default(0)
+  sr            Float    @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([dealershipId, monthKey, channel, day])
+  @@index([dealershipId, monthKey, channel])
+}
+
+model FactEntry {
+  id            Int      @id @default(autoincrement())
+  dealershipId  Int?
+  monthKey      String
+  contracts     Int      @default(0)
+  issued        Int      @default(0)
+  planContracts Int      @default(0)
+  planIssued    Int      @default(0)
+  planJ         Float    @default(0)
+  planO         Float    @default(0)
+  planK         Float    @default(0)
+  planKr        Int      @default(0)
+  planTi        Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  dealership Dealership? @relation(fields: [dealershipId], references: [id], onDelete: Cascade)
+
+  @@unique([dealershipId, monthKey])
+}
+
+model ChannelFact {
+  id            Int      @id @default(autoincrement())
+  dealershipId  Int?
+  monthKey      String
+  channel       String
+  contracts     Int      @default(0)
+  issued        Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  dealership Dealership? @relation(fields: [dealershipId], references: [id], onDelete: Cascade)
+
+  @@unique([dealershipId, monthKey, channel])
+  @@index([dealershipId, monthKey])
+}
+
+// ============================
+// Ссылки ТИ и архив
+// ============================
+
+model EvaluationLink {
+  id        Int      @id @default(autoincrement())
+  dealId    String   @unique
+  url       String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+}
+
+model LinksArchive {
+  id        Int      @id @default(autoincrement())
+  dealId    String
+  url       String
+  model     String?
+  client    String?
+  deletedAt DateTime @default(now())
+
+  @@index([dealId])
+}
+
+// ============================
+// История изменений
+// ============================
+
+model ChangeHistory {
+  id          Int      @id @default(autoincrement())
+  type        String
+  description String
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// ============================
+// Настройки
+// ============================
+
+model Setting {
+  id    Int    @id @default(autoincrement())
+  key   String @unique
+  value String
+}
+
+model BackupTime {
+  id        Int      @id @default(1)
+  time      DateTime
+  updatedAt DateTime @updatedAt
+}

@@ -745,3 +745,48 @@ Stage Summary:
 - Вкладка Настройки: CRUD автосалонов + пользователей + прав
 - Фильтрация вкладок по ролям
 - TODO: фильтрация данных по dealershipId в API endpoints (следующая итерация)
+
+---
+Task ID: deploy-prep
+Agent: main (Super Z)
+Task: Подготовка к деплою на Vercel + Neon
+
+Work Log:
+1. PostgreSQL: создан prisma/schema.prod.prisma с provider="postgresql"
+   - Локальная dev: prisma/schema.prisma остался SQLite
+   - Prod: prisma/schema.prod.prisma — PostgreSQL
+   - package.json: добавлены db:push:prod, db:generate:prod, vercel-build
+
+2. Middleware: src/middleware.ts — защита всех роутов
+   - PUBLIC_ROUTES: /login, /api/auth/login, /api/auth/logout
+   - Без cookie: API → 401, страницы → редирект на /login
+   - С cookie: x-user-id заголовок добавляется для API
+   - Edge-совместимый: использует atob вместо Buffer (работает на Vercel)
+   - Проверено: / → 307, /login → 200, /api/deals без cookie → 401, с cookie → 200
+
+3. Конфигурация деплоя:
+   - .env.example — шаблон переменных окружения
+   - .gitignore — исключает node_modules, .next, db/, .env, логи
+   - .vercelignore — исключает upload/, skills/, examples/, мини-сервисы
+   - package.json: postinstall=prisma generate, vercel-build=prisma generate+db push+next build
+
+4. Инструкция DEPLOY.md:
+   - Шаг 1: Загрузить код на GitHub
+   - Шаг 2: Создать БД на Neon (бесплатно)
+   - Шаг 3: Подключить к Vercel + указать DATABASE_URL
+   - Шаг 4: SQL для создания админ-пользователя
+   - Шаг 5: Готово, ссылка вида crm-avto.vercel.app
+   - Раздел "Как обновлять код" — git push → Vercel авто-деплой
+   - FAQ: данные не теряются, свой домен, бэкапы
+
+5. Проверено локально:
+   - ESLint: 0 ошибок
+   - Middleware: все маршруты защищены
+   - Login: работает с cookie
+   - API: 401 без cookie, 200 с cookie
+
+Stage Summary:
+- Проект готов к деплою на Vercel + Neon
+- Middleware защищает все роуты (edge-совместимый)
+- schema.prod.prisma для PostgreSQL
+- Инструкция в download/DEPLOY.md

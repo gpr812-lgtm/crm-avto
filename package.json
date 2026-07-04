@@ -4,13 +4,18 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
-    "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
-    "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
+    "build": "next build",
+    "start": "next start",
     "lint": "eslint .",
     "db:push": "prisma db push",
+    "db:push:prod": "prisma db push --schema=prisma/schema.prod.prisma",
     "db:generate": "prisma generate",
+    "db:generate:prod": "prisma generate --schema=prisma/schema.prod.prisma",
     "db:migrate": "prisma migrate dev",
-    "db:reset": "prisma migrate reset"
+    "db:reset": "prisma migrate reset",
+    "postinstall": "prisma generate",
+    "vercel-build": "prisma generate --schema=prisma/schema.prod.prisma && prisma db push --schema=prisma/schema.prod.prisma --accept-data-loss && next build",
+    "seed": "bun run scripts/seed.ts && bun run scripts/seed-dealership.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

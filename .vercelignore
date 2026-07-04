@@ -1,0 +1,9 @@
+upload/
+tool-results/
+.zscripts/
+dev.log
+server.log
+db/
+skills/
+examples/
+mini-services/
