@@ -954,7 +954,7 @@ function PlanFactSummaryTable({
         </colgroup>
         <thead>
           <tr className="bg-[hsl(220,20%,96%)]">
-            <th className="border border-[hsl(220,16%,90%)] px-2 py-1.5 text-left">Показатель</th>
+            <th className="border border-[hsl(220,16%,90%)] px-2 py-1.5 text-center">Показатель</th>
             <th className="border border-[hsl(220,16%,90%)] px-2 py-1.5 bg-[hsl(224,56%,25%)] text-white">План</th>
             <th className="border border-[hsl(220,16%,90%)] px-2 py-1.5 bg-[hsl(289,60%,45%)] text-white">Факт (из Склада)</th>
             <th className="border border-[hsl(220,16%,90%)] px-2 py-1.5">% выполнения</th>
@@ -973,7 +973,7 @@ function PlanFactSummaryTable({
               : undefined
             return (
               <tr key={row.label} className="hover:bg-[hsl(220,23%,97%)]">
-                <td className="border border-[hsl(220,16%,90%)] px-2 py-1 font-medium">
+                <td className="border border-[hsl(220,16%,90%)] px-2 py-1 font-medium text-center">
                   {row.label}
                   {row.isPercentage && <span className="text-[9px] text-[hsl(215,16%,47%)] ml-1">(% от сделок)</span>}
                 </td>

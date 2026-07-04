@@ -197,8 +197,8 @@ export function AnalyticsTab() {
         )}
       </Card>
 
-      {/* KPI — 4 квадрата (Штуки | ЖОК | КР | ТИ), в каждом 4 статуса по центру */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+      {/* KPI — 4 квадрата (Штуки | ЖОК | КР | ТИ), в каждом 4 статуса по горизонтали */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiSquare
           title="Штуки"
           data={[
@@ -331,7 +331,7 @@ function KpiCard({ label, value, color, sub }: { label: string; value: string; c
   )
 }
 
-// KpiSquare — квадрат с заголовком и 4 статусами по центру
+// KpiSquare — квадрат с заголовком метрики и 4 статусами по горизонтали
 function KpiSquare({ title, data }: {
   title: string
   data: { label: string; value: number; color: string; format?: 'currency' }[]
@@ -343,16 +343,15 @@ function KpiSquare({ title, data }: {
       <div className="bg-[hsl(221,60%,38%)] text-white px-3 py-1.5 text-xs font-semibold text-center uppercase tracking-wide">
         {title}
       </div>
-      <div className="divide-y">
+      <div className="grid grid-cols-4 divide-x divide-[hsl(220,16%,90%)]">
         {data.map((row) => (
-          <div key={row.label} className="flex items-center justify-between px-3 py-2 text-center">
-            <div className="text-[11px] text-[hsl(215,16%,47%)] font-medium flex-1 text-left">
+          <div key={row.label} className="px-2 py-2 text-center">
+            <div className="text-[10px] text-[hsl(215,16%,47%)] font-medium mb-1 uppercase tracking-wide">
               {row.label}
             </div>
-            <div className="text-lg font-bold tabular-nums flex-1 text-center" style={{ color: row.color }}>
+            <div className="text-lg font-bold tabular-nums" style={{ color: row.color }}>
               {fmt(row.value, row.format)}
             </div>
-            <div className="flex-1"></div>
           </div>
         ))}
       </div>

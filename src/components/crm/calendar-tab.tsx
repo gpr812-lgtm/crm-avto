@@ -106,22 +106,20 @@ export function CalendarTab() {
 
   return (
     <div className="h-full overflow-auto crm-scroll p-3 space-y-3">
-      {/* Toolbar */}
-      <Card className="p-3 flex items-center gap-3 flex-nowrap text-xs overflow-x-auto crm-scroll">
-        <div className="flex items-center gap-2 flex-shrink-0">
+      {/* Toolbar — всё в одну линию */}
+      <Card className="p-2.5 flex items-center gap-2 flex-nowrap text-xs overflow-x-auto crm-scroll">
+        <div className="flex items-center gap-1.5 flex-shrink-0">
           <Button size="sm" variant="ghost" onClick={prevMonth} className="h-7 w-7 p-0"><ChevronLeft className="w-4 h-4" /></Button>
-          <span className="font-semibold min-w-40 text-center text-sm whitespace-nowrap">
+          <span className="font-semibold min-w-36 text-center text-sm whitespace-nowrap">
             {['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][month - 1]} {year}
           </span>
           <Button size="sm" variant="ghost" onClick={nextMonth} className="h-7 w-7 p-0"><ChevronRight className="w-4 h-4" /></Button>
         </div>
         <div className="w-px h-6 bg-[hsl(220,16%,90%)] flex-shrink-0" />
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <Badge variant="outline" className="whitespace-nowrap bg-[hsl(220,20%,95%)]">📅 План встреч: {totals.meetings}</Badge>
-          <Badge variant="outline" className="whitespace-nowrap bg-[hsl(220,20%,95%)]">📋 План контрактов: {totals.contracts}</Badge>
-          <Badge className="bg-[hsl(142,60%,35%)] hover:bg-[hsl(142,60%,35%)] whitespace-nowrap">📄 Факт контрактов: {totals.factContracts}</Badge>
-          <Badge className="bg-[hsl(217,91%,45%)] hover:bg-[hsl(217,91%,45%)] whitespace-nowrap">📤 Факт выдач: {totals.factIssued}</Badge>
-        </div>
+        <Badge variant="outline" className="whitespace-nowrap bg-[hsl(220,20%,95%)] flex-shrink-0">📅 Встречи: {totals.meetings}</Badge>
+        <Badge variant="outline" className="whitespace-nowrap bg-[hsl(220,20%,95%)] flex-shrink-0">📋 План: {totals.contracts}</Badge>
+        <Badge className="bg-[hsl(142,60%,35%)] hover:bg-[hsl(142,60%,35%)] whitespace-nowrap flex-shrink-0">📄 Факт: {totals.factContracts}</Badge>
+        <Badge className="bg-[hsl(217,91%,45%)] hover:bg-[hsl(217,91%,45%)] whitespace-nowrap flex-shrink-0">📤 Выдачи: {totals.factIssued}</Badge>
       </Card>
 
       {/* Calendar grid */}
