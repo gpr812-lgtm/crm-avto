@@ -12,7 +12,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import {
-  Building2, Users, Plus, Trash2, Check, X, Lock, Shield,
+  Building2, Users, Plus, Trash2, Check, X, Lock, Shield, Pencil,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -42,6 +42,9 @@ export function SettingsTab() {
   const [activeSection, setActiveSection] = useState<'dealerships' | 'users'>('dealerships')
   const [newDealerName, setNewDealerName] = useState('')
   const [newDealerCode, setNewDealerCode] = useState('')
+  const [editingDealerId, setEditingDealerId] = useState<number | null>(null)
+  const [editDealerName, setEditDealerName] = useState('')
+  const [editDealerCode, setEditDealerCode] = useState('')
   const [userDialog, setUserDialog] = useState<{ mode: 'create' | 'edit' | 'access'; user?: UserItem } | null>(null)
 
   const loadData = async () => {
@@ -91,6 +94,40 @@ export function SettingsTab() {
       loadData()
     } else {
       toast.error('Не удалось создать автосалон')
+    }
+  }
+
+  const handleSaveDealer = async (id: number) => {
+    if (!editDealerName.trim()) {
+      toast.warning('Название не может быть пустым')
+      return
+    }
+    const res = await fetch(`/api/dealerships/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: editDealerName.trim(), code: editDealerCode.trim() || null }),
+    })
+    if (res.ok) {
+      toast.success('Автосалон обновлён')
+      setEditingDealerId(null)
+      setEditDealerName('')
+      setEditDealerCode('')
+      loadData()
+    } else {
+      const err = await res.json().catch(() => ({}))
+      toast.error(err.error || 'Не удалось обновить')
+    }
+  }
+
+  const handleDeleteDealer = async (id: number, name: string) => {
+    if (!confirm(`Удалить автосалон "${name}"?\nВсе данные этого автосалона будут удалены безвозвратно.`)) return
+    const res = await fetch(`/api/dealerships/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      toast.success(`Автосалон "${name}" удалён`)
+      loadData()
+    } else {
+      const err = await res.json().catch(() => ({}))
+      toast.error(err.error || 'Не удалось удалить')
     }
   }
 
@@ -155,10 +192,66 @@ export function SettingsTab() {
                 <div key={d.id} className="flex items-center gap-2 px-3 py-2 rounded border border-[hsl(220,16%,90%)] hover:bg-[hsl(220,20%,98%)]">
                   <Building2 className="w-4 h-4 text-[hsl(221,60%,38%)]" />
                   <div className="flex-1">
-                    <div className="text-xs font-medium">{d.name}</div>
-                    {d.code && <div className="text-[10px] text-[hsl(215,16%,60%)]">{d.code}</div>}
+                    {editingDealerId === d.id ? (
+                      <div className="flex gap-1.5 items-center">
+                        <Input
+                          value={editDealerName}
+                          onChange={(e) => setEditDealerName(e.target.value)}
+                          className="h-6 text-xs flex-1"
+                          placeholder="Название"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSaveDealer(d.id)
+                            if (e.key === 'Escape') { setEditingDealerId(null); setEditDealerName(''); setEditDealerCode('') }
+                          }}
+                        />
+                        <Input
+                          value={editDealerCode}
+                          onChange={(e) => setEditDealerCode(e.target.value)}
+                          className="h-6 text-xs w-24"
+                          placeholder="Код"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSaveDealer(d.id)
+                            if (e.key === 'Escape') { setEditingDealerId(null); setEditDealerName(''); setEditDealerCode('') }
+                          }}
+                        />
+                        <Button size="sm" className="h-6 px-2 text-[10px]" onClick={() => handleSaveDealer(d.id)}>
+                          <Check className="w-3 h-3" />
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => { setEditingDealerId(null); setEditDealerName(''); setEditDealerCode('') }}>
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="text-xs font-medium">{d.name}</div>
+                        {d.code && <div className="text-[10px] text-[hsl(215,16%,60%)]">{d.code}</div>}
+                      </>
+                    )}
                   </div>
-                  <Badge variant="outline" className="text-[10px]">ID: {d.id}</Badge>
+                  {editingDealerId !== d.id && (
+                    <>
+                      <Badge variant="outline" className="text-[10px]">ID: {d.id}</Badge>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 w-6 p-0"
+                        onClick={() => { setEditingDealerId(d.id); setEditDealerName(d.name); setEditDealerCode(d.code || '') }}
+                        title="Редактировать"
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 w-6 p-0 text-[hsl(0,72%,51%)]"
+                        onClick={() => handleDeleteDealer(d.id, d.name)}
+                        title="Удалить"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </>
+                  )}
                 </div>
               ))}
             </div>
