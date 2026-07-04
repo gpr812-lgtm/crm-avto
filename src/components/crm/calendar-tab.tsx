@@ -149,22 +149,22 @@ export function CalendarTab() {
                 <div className={`text-xs font-semibold ${isToday ? 'text-[#2a5298]' : isWeekend ? 'text-[#dc3545]' : 'text-[#2c3e50]'}`}>
                   {day}
                 </div>
-                <div className="space-y-0.5 mt-0.5">
+                <div className="mt-0.5">
                   {(p.meetings > 0 || p.contracts > 0 || f.contracts > 0 || f.issued > 0) ? (
-                    <>
+                    <div className="flex items-center gap-1 text-[10px] flex-wrap">
                       {p.meetings > 0 && (
-                        <div className="text-[10px] text-[#6a1b9a] flex justify-between"><span>📅 Встречи:</span><span>{p.meetings}</span></div>
+                        <span className="text-[#6a1b9a]">📅{p.meetings}</span>
                       )}
                       {p.contracts > 0 && (
-                        <div className="text-[10px] text-[#f57f17] flex justify-between"><span>📋 План:</span><span>{p.contracts}</span></div>
+                        <span className="text-[#f57f17]">📋{p.contracts}</span>
                       )}
                       {f.contracts > 0 && (
-                        <div className="text-[10px] text-[#28a745] flex justify-between"><span>📄 Факт:</span><span>{f.contracts}</span></div>
+                        <span className="text-[#28a745]">📄{f.contracts}</span>
                       )}
                       {f.issued > 0 && (
-                        <div className="text-[10px] text-[#1a73e8] flex justify-between"><span>📤 Выдачи:</span><span>{f.issued}</span></div>
+                        <span className="text-[#1a73e8]">📤{f.issued}</span>
                       )}
-                    </>
+                    </div>
                   ) : (
                     <div className="text-[10px] text-[#bbb]">+</div>
                   )}
