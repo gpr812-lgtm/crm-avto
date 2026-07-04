@@ -142,31 +142,31 @@ export function CalendarTab() {
               <button
                 key={idx}
                 onClick={() => openDay(day)}
-                className={`text-left rounded border min-h-20 p-1 hover:border-[#2a5298] hover:shadow-sm transition-all ${
+                className={`text-center rounded border min-h-24 p-1.5 hover:border-[#2a5298] hover:shadow-sm transition-all ${
                   isToday ? 'border-[#2a5298] bg-[#e8f0fe]' : isWeekend ? 'border-[#ffebee] bg-[#fff8f8]' : 'border-[#e0e0e0] bg-white'
                 }`}
               >
-                <div className={`text-xs font-semibold ${isToday ? 'text-[#2a5298]' : isWeekend ? 'text-[#dc3545]' : 'text-[#2c3e50]'}`}>
+                <div className={`text-sm font-bold mb-1 ${isToday ? 'text-[#2a5298]' : isWeekend ? 'text-[#dc3545]' : 'text-[#2c3e50]'}`}>
                   {day}
                 </div>
-                <div className="mt-0.5">
+                <div>
                   {(p.meetings > 0 || p.contracts > 0 || f.contracts > 0 || f.issued > 0) ? (
-                    <div className="flex items-center gap-1 text-[10px] flex-wrap">
+                    <div className="space-y-0.5">
                       {p.meetings > 0 && (
-                        <span className="text-[#6a1b9a]">📅{p.meetings}</span>
+                        <div className="text-xs text-[#6a1b9a] font-medium">📅 {p.meetings}</div>
                       )}
                       {p.contracts > 0 && (
-                        <span className="text-[#f57f17]">📋{p.contracts}</span>
+                        <div className="text-xs text-[#f57f17] font-medium">📋 {p.contracts}</div>
                       )}
                       {f.contracts > 0 && (
-                        <span className="text-[#28a745]">📄{f.contracts}</span>
+                        <div className="text-xs text-[#28a745] font-medium">📄 {f.contracts}</div>
                       )}
                       {f.issued > 0 && (
-                        <span className="text-[#1a73e8]">📤{f.issued}</span>
+                        <div className="text-xs text-[#1a73e8] font-medium">📤 {f.issued}</div>
                       )}
                     </div>
                   ) : (
-                    <div className="text-[10px] text-[#bbb]">+</div>
+                    <div className="text-xs text-[#bbb]">+</div>
                   )}
                 </div>
               </button>
