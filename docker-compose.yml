@@ -1,0 +1,41 @@
+# ============================
+# docker-compose.yml — CRM + PostgreSQL
+# ============================
+version: '3.8'
+
+services:
+  # PostgreSQL база данных
+  db:
+    image: postgres:16-alpine
+    container_name: crm-db
+    restart: always
+    environment:
+      POSTGRES_DB: crm
+      POSTGRES_USER: crm_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-CrmSecure2026}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crm_user -d crm"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # CRM приложение
+  app:
+    build: .
+    container_name: crm-app
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql://crm_user:${DB_PASSWORD:-CrmSecure2026}@db:5432/crm?schema=public"
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:
