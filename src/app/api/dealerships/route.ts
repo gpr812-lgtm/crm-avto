@@ -21,6 +21,15 @@ export async function POST(req: NextRequest) {
     const dealership = await db.dealership.create({
       data: { name, code: code || null },
     })
+    // Auto-grant access to all admin users
+    const admins = await db.user.findMany({ where: { role: 'ADMIN' } })
+    for (const admin of admins) {
+      await db.userDealershipAccess.upsert({
+        where: { userId_dealershipId: { userId: admin.id, dealershipId: dealership.id } },
+        update: {},
+        create: { userId: admin.id, dealershipId: dealership.id },
+      })
+    }
     return NextResponse.json({ dealership }, { status: 201 })
   } catch (e) {
     console.error('POST /api/dealerships error:', e)

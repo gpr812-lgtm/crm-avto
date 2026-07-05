@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
         email: user.email,
         name: user.name,
         role: user.role,
-        dealerships: user.dealershipAccess.map((a) => ({
+        dealerships: user.role === 'ADMIN' ? (await db.dealership.findMany({ orderBy: { name: 'asc' } })).map((d) => ({ id: d.id, name: d.name, code: d.code })) : user.dealershipAccess.map((a) => ({
           id: a.dealership.id,
           name: a.dealership.name,
           code: a.dealership.code,

@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     if (!table || !day || !model) return NextResponse.json({ error: 'table, day, model required' }, { status: 400 })
 
     const comment = await db.cellComment.upsert({
-      where: { table_day_model: { table, day: Number(day), model } },
+      where: { dealershipId_table_day_model: { dealershipId: 1, table, day: Number(day), model } },
       update: { text: String(text || '') },
       create: { table, day: Number(day), model, text: String(text || '') },
     })

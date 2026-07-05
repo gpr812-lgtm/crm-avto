@@ -26,7 +26,7 @@ export async function PATCH(req: NextRequest) {
     if (!monthKey || !day) return NextResponse.json({ error: 'monthKey, day required' }, { status: 400 })
 
     const plan = await db.todayPlan.upsert({
-      where: { monthKey_day: { monthKey, day: Number(day) } },
+      where: { dealershipId_monthKey_day: { dealershipId: 1, monthKey, day: Number(day) } },
       update: {
         ...(meetings !== undefined ? { meetings: Number(meetings) || 0 } : {}),
         ...(contracts !== undefined ? { contracts: Number(contracts) || 0 } : {}),

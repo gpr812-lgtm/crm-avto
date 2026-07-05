@@ -48,7 +48,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     const entry = await db.trafficEntry.upsert({
-      where: { monthKey_model_type_day: { monthKey, model, type, day: Number(day) } },
+      where: { dealershipId_monthKey_model_type_day: { dealershipId: 1, monthKey, model, type, day: Number(day) } },
       update: { value: Number(value) || 0 },
       create: { monthKey, model, type, day: Number(day), value: Number(value) || 0 },
     })

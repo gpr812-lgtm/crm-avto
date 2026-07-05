@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     const [channels, planEntries, factEntry, channelFacts] = await Promise.all([
       db.channel.findMany({ orderBy: { order: 'asc' } }),
       db.planEntry.findMany({ where: { monthKey: month } }),
-      db.factEntry.findUnique({ where: { monthKey: month } }),
+      db.factEntry.findFirst({ where: { monthKey: month } }),
       db.channelFact.findMany({ where: { monthKey: month } }),
     ])
 
@@ -97,7 +97,7 @@ export async function PATCH(req: NextRequest) {
     // Per-channel fact (К., В.) — entered manually per channel
     if (channelFactContracts !== undefined || channelFactIssued !== undefined) {
       const cf = await db.channelFact.upsert({
-        where: { monthKey_channel: { monthKey, channel } },
+        where: { dealershipId_monthKey_channel: { dealershipId: 1, monthKey, channel } },
         update: {
           ...(channelFactContracts !== undefined ? { contracts: Number(channelFactContracts) || 0 } : {}),
           ...(channelFactIssued !== undefined ? { issued: Number(channelFactIssued) || 0 } : {}),
@@ -114,14 +114,14 @@ export async function PATCH(req: NextRequest) {
 
     // Update day-level plan
     if (day !== undefined) {
-      const ch = await db.channel.findUnique({ where: { name: channel } })
+      const ch = await db.channel.findFirst({ where: { name: channel } })
       const chBudget = budget ?? ch?.budget ?? 0
       const chCpl = cpl ?? ch?.cpl ?? 0
       const chRl = rl ?? ch?.rl ?? 0
       const chSr = sr ?? ch?.sr ?? 0
 
       const entry = await db.planEntry.upsert({
-        where: { monthKey_channel_day: { monthKey, channel, day: Number(day) } },
+        where: { dealershipId_monthKey_channel_day: { dealershipId: 1, monthKey, channel, day: Number(day) } },
         update: {
           leads: Number(leads) || 0,
           ...(budget !== undefined ? { budget: Number(budget) } : {}),
@@ -145,10 +145,10 @@ export async function PATCH(req: NextRequest) {
 
     // Update channel-level params
     if (budget !== undefined || cpl !== undefined || rl !== undefined || sr !== undefined) {
-      const ch = await db.channel.findUnique({ where: { name: channel } })
+      const ch = await db.channel.findFirst({ where: { name: channel } })
       if (ch) {
         await db.channel.update({
-          where: { name: channel },
+          where: { id: ch.id },
           data: {
             ...(budget !== undefined ? { budget: Number(budget) } : {}),
             ...(cpl !== undefined ? { cpl: Number(cpl) } : {}),
@@ -198,7 +198,7 @@ export async function PUT(req: NextRequest) {
     if (planTi !== undefined) data.planTi = Number(planTi) || 0
 
     const fact = await db.factEntry.upsert({
-      where: { monthKey },
+      where: { dealershipId_monthKey: { dealershipId: 1, monthKey } },
       update: data,
       create: { monthKey, ...data },
     })

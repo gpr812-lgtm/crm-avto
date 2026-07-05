@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 const SESSION_COOKIE = 'crm_session'
 
 // Роуты которые НЕ требуют авторизации
-const PUBLIC_ROUTES = ['/login', '/api/auth/login', '/api/auth/logout']
+const PUBLIC_ROUTES = ['/login', '/api/auth/login', '/api/auth/logout', '/api/auth/me']
 
 // Парсинг session token без Node.js модулей (для edge runtime)
 function parseSession(token: string): { userId: number; email: string } | null {

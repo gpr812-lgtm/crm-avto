@@ -23,13 +23,13 @@ export async function POST(req: NextRequest) {
     if (!key || !label) return NextResponse.json({ error: 'key and label required' }, { status: 400 })
 
     // Check key uniqueness
-    const existing = await db.dealColumn.findUnique({ where: { key } })
+    const existing = await db.dealColumn.findFirst({ where: { dealershipId_key: { dealershipId: 1, key } } })
     if (existing) return NextResponse.json({ error: 'key already exists' }, { status: 400 })
 
     // Compute order: if insertAfter given, insert after that column; else append
     let order = 0
     if (insertAfter) {
-      const after = await db.dealColumn.findUnique({ where: { key: insertAfter } })
+      const after = await db.dealColumn.findFirst({ where: { key: insertAfter } })
       if (after) {
         order = after.order + 1
         // Shift all columns after this one
