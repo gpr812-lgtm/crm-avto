@@ -2,6 +2,7 @@
  * Auth store — current user, login/logout, dealership selection
  */
 import { create } from 'zustand'
+import { setDealershipIds } from '@/lib/api'
 
 export interface UserDealership {
   id: number
@@ -44,6 +45,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const data = await res.json()
       if (data.user) {
         const allIds = new Set(data.user.dealerships.map((d: UserDealership) => d.id))
+        setDealershipIds(Array.from(allIds))
         set({ user: data.user, loading: false, selectedDealershipIds: allIds })
       } else {
         set({ user: null, loading: false })
@@ -66,6 +68,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
       const data = await res.json()
       const allIds = new Set(data.user.dealerships.map((d: UserDealership) => d.id))
+      setDealershipIds(Array.from(allIds))
       set({ user: data.user, selectedDealershipIds: allIds })
       return true
     } catch (e) {
@@ -88,6 +91,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       } else {
         next.add(id)
       }
+      // Sync with API client
+      setDealershipIds(Array.from(next))
       return { selectedDealershipIds: next }
     })
   },
@@ -95,10 +100,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   selectAllDealerships: () => {
     const { user } = get()
     if (!user) return
-    set({ selectedDealershipIds: new Set(user.dealerships.map((d) => d.id)) })
+    const ids = new Set(user.dealerships.map((d) => d.id))
+    setDealershipIds(Array.from(ids))
+    set({ selectedDealershipIds: ids })
   },
 
   selectSingleDealership: (id) => {
+    setDealershipIds([id])
     set({ selectedDealershipIds: new Set([id]) })
   },
 

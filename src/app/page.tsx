@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useCrmStore } from '@/lib/store'
 import { useDebouncedCallback } from '@/hooks/use-debounce'
 import { Button } from '@/components/ui/button'
@@ -52,7 +52,7 @@ const KEYBOARD_SHORTCUTS = [
 
 export default function HomePage() {
   const router = useRouter()
-  const { user, loading: authLoading, loadUser, logout, hasTabAccess } = useAuthStore()
+  const { user, loading: authLoading, loadUser, logout, hasTabAccess, selectedDealershipIds } = useAuthStore()
   const {
     activeTab, setActiveTab,
     deals, columns, options,
@@ -94,9 +94,22 @@ export default function HomePage() {
     loadComments()
     loadEvalLinks()
     loadHistory()
-    const t = setTimeout(() => setInitialLoading(false), 800)
+    const t = setTimeout(() => { setInitialLoading(false); dataLoadedRef.current = true }, 800)
     return () => clearTimeout(t)
   }, [user, loadDeals, loadColumns, loadOptions, loadChannels, loadStats, loadComments, loadEvalLinks, loadHistory])
+
+  // Reload data when dealership selection changes
+  const dealershipKey = Array.from(selectedDealershipIds).sort().join(',')
+  const dataLoadedRef = useRef(false)
+  useEffect(() => {
+    if (!user || !dealershipKey || !dataLoadedRef.current) return
+    Promise.all([
+      loadDeals(), loadColumns(), loadOptions(), loadChannels(),
+      loadStats(), loadComments(), loadEvalLinks(), loadHistory(),
+    ]).then(() => {
+      setInitialLoading(false)
+    })
+  }, [dealershipKey, user, loadDeals, loadColumns, loadOptions, loadChannels, loadStats, loadComments, loadEvalLinks, loadHistory])
 
   const debouncedSearch = useDebouncedCallback((q: string) => {
     loadDeals(q ? { search: q } : undefined)
