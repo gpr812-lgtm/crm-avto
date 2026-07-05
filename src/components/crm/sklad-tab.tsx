@@ -419,6 +419,9 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
             <Button onClick={() => csvFileRef.current?.click()} variant="outline" size="sm">
               <Upload className="w-3.5 h-3.5 mr-1" /> Импорт CSV
             </Button>
+            <Button onClick={() => setListsSettingsOpen(true)} variant="outline" size="sm">
+              <Settings className="w-3.5 h-3.5 mr-1" /> Настроить списки
+            </Button>
           </div>
           <input ref={csvFileRef} type="file" accept=".csv" onChange={handleImportCSVFile} className="hidden" />
         </div>
