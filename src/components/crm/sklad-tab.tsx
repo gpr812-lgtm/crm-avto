@@ -413,7 +413,7 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
             чтобы начать работу с CRM.
           </p>
           <div className="flex items-center gap-2 justify-center">
-            <Button onClick={() => useCrmStore.getState().setActiveTab('sklad')} size="sm" className="bg-[hsl(221,60%,38%)] hover:bg-[hsl(221,60%,33%)]">
+            <Button onClick={() => window.dispatchEvent(new CustomEvent('open-deal-form'))} size="sm" className="bg-[hsl(221,60%,38%)] hover:bg-[hsl(221,60%,33%)]">
               <Plus className="w-3.5 h-3.5 mr-1" /> Добавить сделку
             </Button>
             <Button onClick={() => csvFileRef.current?.click()} variant="outline" size="sm">
@@ -425,6 +425,7 @@ export function SkladTab({ deals, columns, options }: SkladTabProps) {
           </div>
           <input ref={csvFileRef} type="file" accept=".csv" onChange={handleImportCSVFile} className="hidden" />
         </div>
+        <ListsSettingsDialog open={listsSettingsOpen} onOpenChange={setListsSettingsOpen} />
       </div>
     )
   }
